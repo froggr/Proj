@@ -2,14 +2,14 @@
   <Modal :show="show" title="Add Bible Verse" @close="$emit('close')">
     <div class="space-y-4">
       <!-- Mode Toggle -->
-      <div class="flex gap-2 p-1 bg-gray-800 rounded-lg">
+      <div class="flex gap-2 p-1 bg-neutral-800 rounded-lg">
         <button
           @click="mode = 'api'"
           :class="[
             'flex-1 px-4 py-2 rounded-md font-medium text-sm transition-colors',
             mode === 'api'
-              ? 'bg-blue-600 text-white'
-              : 'text-gray-400 hover:text-white'
+              ? 'bg-gold-500 text-black'
+              : 'text-neutral-400 hover:text-white'
           ]"
         >
           Fetch from API
@@ -19,8 +19,8 @@
           :class="[
             'flex-1 px-4 py-2 rounded-md font-medium text-sm transition-colors',
             mode === 'manual'
-              ? 'bg-blue-600 text-white'
-              : 'text-gray-400 hover:text-white'
+              ? 'bg-gold-500 text-black'
+              : 'text-neutral-400 hover:text-white'
           ]"
         >
           Manual Entry
@@ -30,27 +30,27 @@
       <!-- API Mode -->
       <div v-if="mode === 'api'" class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-gray-300 mb-2">
+          <label class="block text-sm font-medium text-neutral-300 mb-2">
             API.Bible Key (optional)
           </label>
           <input
             v-model="apiKey"
             type="password"
             placeholder="Enter your API.Bible key for modern translations"
-            class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="w-full px-4 py-2 bg-neutral-800 border border-neutral-600 rounded-lg text-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-gold-500"
           />
-          <p class="mt-1 text-xs text-gray-400">
-            Get free key at <a href="https://scripture.api.bible" target="_blank" class="text-blue-400 hover:underline">scripture.api.bible</a> (500 requests/day free)
+          <p class="mt-1 text-xs text-neutral-400">
+            Get free key at <a href="https://scripture.api.bible" target="_blank" class="text-gold-400 hover:underline">scripture.api.bible</a> (500 requests/day free)
           </p>
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-300 mb-2">
+          <label class="block text-sm font-medium text-neutral-300 mb-2">
             Translation
           </label>
           <select
             v-model="translation"
-            class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="w-full px-4 py-2 bg-neutral-800 border border-neutral-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-gold-500"
           >
             <optgroup label="Modern Translations (API.Bible)">
               <option value="de4e12af7f28f599-02">NIV (New International)</option>
@@ -76,15 +76,15 @@
             <input
               v-model="showVerseNumbers"
               type="checkbox"
-              class="w-4 h-4 bg-gray-700 border-gray-600 rounded text-blue-600 focus:ring-blue-500 focus:ring-2"
+              class="w-4 h-4 bg-neutral-800 border-neutral-600 rounded text-gold-500 focus:ring-gold-500 focus:ring-2"
             />
-            <span class="text-sm text-gray-300">Show verse numbers in text</span>
+            <span class="text-sm text-neutral-300">Show verse numbers in text</span>
           </label>
         </div>
 
         <!-- Quick Entry Mode -->
         <div>
-          <label class="block text-sm font-medium text-gray-300 mb-2">
+          <label class="block text-sm font-medium text-neutral-300 mb-2">
             Quick Entry
           </label>
           <input
@@ -94,7 +94,7 @@
             placeholder="e.g., john3:16, mat 10:2-4, 1cor13:4-7"
             class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
           />
-          <p class="mt-1 text-xs text-gray-400">
+          <p class="mt-1 text-xs text-neutral-400">
             Type book chapter:verse (flexible format: "john3:16" or "mat 10 : 2-4")
           </p>
           <div v-if="parsedReference" class="mt-2 p-2 bg-green-900/30 border border-green-700 rounded text-green-300 text-sm">
@@ -108,20 +108,20 @@
             <div class="w-full border-t border-gray-600"></div>
           </div>
           <div class="relative flex justify-center text-xs">
-            <span class="px-2 bg-gray-800 text-gray-400">or use dropdowns</span>
+            <span class="px-2 bg-neutral-900 text-neutral-400">or use dropdowns</span>
           </div>
         </div>
 
         <!-- Dropdown Mode -->
         <div class="grid grid-cols-3 gap-2">
           <div>
-            <label class="block text-sm font-medium text-gray-300 mb-2">
+            <label class="block text-sm font-medium text-neutral-300 mb-2">
               Book
             </label>
             <select
               v-model="book"
               @change="onBookChange"
-              class="w-full px-2 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full px-2 py-2 bg-neutral-800 border border-neutral-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-gold-500"
             >
               <option value="">Select...</option>
               <optgroup v-for="(books, testament) in bibleBooks" :key="testament" :label="testament">
@@ -133,7 +133,7 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-300 mb-2">
+            <label class="block text-sm font-medium text-neutral-300 mb-2">
               Chapter
             </label>
             <select
@@ -148,14 +148,14 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-300 mb-2">
+            <label class="block text-sm font-medium text-neutral-300 mb-2">
               Verses
             </label>
             <div class="flex gap-1">
               <select
                 v-model.number="verseFrom"
                 :disabled="!chapter"
-                class="w-full px-1 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                class="w-full px-1 py-2 bg-neutral-800 border border-neutral-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-gold-500 disabled:opacity-50"
               >
                 <option value="">From</option>
                 <option v-for="v in availableVerses" :key="v" :value="v">{{ v }}</option>
@@ -163,7 +163,7 @@
               <select
                 v-model.number="verseTo"
                 :disabled="!verseFrom"
-                class="w-full px-1 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                class="w-full px-1 py-2 bg-neutral-800 border border-neutral-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-gold-500 disabled:opacity-50"
               >
                 <option value="">To</option>
                 <option v-for="v in availableVerses" :key="v" :value="v">{{ v }}</option>
@@ -175,7 +175,7 @@
         <button
           @click="fetchVerse"
           :disabled="!book || !chapter || !verseFrom || loading"
-          class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-semibold text-white transition-colors"
+          class="w-full px-4 py-2 bg-gold-500 hover:bg-gold-600 disabled:bg-neutral-600 disabled:cursor-not-allowed rounded-lg font-semibold text-black transition-colors"
         >
           {{ loading ? 'Fetching...' : 'Fetch Scripture' }}
         </button>
@@ -185,11 +185,11 @@
         </div>
 
         <div v-if="text && !loading" class="space-y-2">
-          <label class="block text-sm font-medium text-gray-300">
+          <label class="block text-sm font-medium text-neutral-300">
             Fetched Scripture
           </label>
-          <div class="p-4 bg-gray-700 border border-gray-600 rounded-lg">
-            <p class="text-sm font-semibold text-gray-300 mb-2">{{ reference }}</p>
+          <div class="p-4 bg-neutral-800 border border-neutral-600 rounded-lg">
+            <p class="text-sm font-semibold text-neutral-300 mb-2">{{ reference }}</p>
             <p class="text-white">{{ text }}</p>
           </div>
         </div>
@@ -198,24 +198,24 @@
       <!-- Manual Mode -->
       <div v-if="mode === 'manual'" class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-gray-300 mb-2">
+          <label class="block text-sm font-medium text-neutral-300 mb-2">
             Reference
           </label>
           <input
             v-model="reference"
             type="text"
             placeholder="e.g., John 3:16-17"
-            class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="w-full px-4 py-2 bg-neutral-800 border border-neutral-600 rounded-lg text-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-gold-500"
           />
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-300 mb-2">
+          <label class="block text-sm font-medium text-neutral-300 mb-2">
             Translation
           </label>
           <select
             v-model="translation"
-            class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="w-full px-4 py-2 bg-neutral-800 border border-neutral-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-gold-500"
           >
             <option value="NIV">NIV</option>
             <option value="ESV">ESV</option>
@@ -226,21 +226,21 @@
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-300 mb-2">
+          <label class="block text-sm font-medium text-neutral-300 mb-2">
             Verse Text
           </label>
           <textarea
             v-model="text"
             rows="6"
             placeholder="Paste the verse text here..."
-            class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="w-full px-4 py-2 bg-neutral-800 border border-neutral-600 rounded-lg text-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-gold-500"
           ></textarea>
         </div>
       </div>
 
       <div class="grid grid-cols-2 gap-4">
         <div>
-          <label class="block text-sm font-medium text-gray-300 mb-2">
+          <label class="block text-sm font-medium text-neutral-300 mb-2">
             Lines Per Slide
           </label>
           <input
@@ -248,38 +248,40 @@
             type="number"
             min="1"
             max="10"
-            class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="w-full px-4 py-2 bg-neutral-800 border border-neutral-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-gold-500"
           />
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-300 mb-2">
+          <label class="block text-sm font-medium text-neutral-300 mb-2">
             Background Color
           </label>
           <input
             v-model="background"
             type="color"
-            class="w-full h-[42px] bg-gray-700 border border-gray-600 rounded-lg cursor-pointer"
+            class="w-full h-[42px] bg-neutral-800 border border-neutral-600 rounded-lg cursor-pointer"
           />
         </div>
       </div>
 
-      <div class="flex gap-3 justify-end pt-4">
-        <button
-          @click="$emit('close')"
-          class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-semibold text-white transition-colors"
-        >
-          Cancel
-        </button>
-        <button
-          @click="addSlide"
-          :disabled="!reference || !text"
-          class="px-4 py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-semibold text-white transition-colors"
-        >
-          Add Slide
-        </button>
-      </div>
     </div>
+
+    <template #footer>
+      <button
+        @click="$emit('close')"
+        class="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg transition-colors"
+      >
+        Cancel
+      </button>
+      <button
+        @click="addSlide"
+        :disabled="!reference || !text"
+        class="px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        :class="reference && text ? 'bg-gold-500 hover:bg-gold-600 text-black' : 'bg-neutral-600 text-neutral-400'"
+      >
+        Add Slide
+      </button>
+    </template>
   </Modal>
 </template>
 

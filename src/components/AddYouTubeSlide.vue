@@ -2,32 +2,32 @@
   <Modal :show="show" :title="initialSlide ? 'Edit YouTube Video' : 'Add YouTube Video'" @close="$emit('close')">
     <div class="space-y-4">
       <div>
-        <label class="block text-sm font-medium text-gray-300 mb-2">
+        <label class="block text-sm font-medium text-neutral-300 mb-2">
           YouTube URL
         </label>
         <input
           v-model="youtubeUrl"
           type="url"
           placeholder="https://www.youtube.com/watch?v=..."
-          class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          class="w-full px-4 py-2 bg-neutral-800 border border-neutral-600 rounded-lg text-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-gold-500"
           @input="extractVideoId"
         />
       </div>
 
       <div>
-        <label class="block text-sm font-medium text-gray-300 mb-2">
+        <label class="block text-sm font-medium text-neutral-300 mb-2">
           Title (optional)
         </label>
         <input
           v-model="title"
           type="text"
           placeholder="e.g., Worship Song"
-          class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          class="w-full px-4 py-2 bg-neutral-800 border border-neutral-600 rounded-lg text-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-gold-500"
         />
       </div>
 
       <div v-if="videoId" class="space-y-2">
-        <label class="block text-sm font-medium text-gray-300">
+        <label class="block text-sm font-medium text-neutral-300">
           Preview
         </label>
         <div class="bg-black rounded-lg overflow-hidden aspect-video">
@@ -41,22 +41,24 @@
         </div>
       </div>
 
-      <div class="flex gap-3 justify-end pt-4">
-        <button
-          @click="$emit('close')"
-          class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-semibold text-white transition-colors"
-        >
-          Cancel
-        </button>
-        <button
-          @click="addSlide"
-          :disabled="!videoId"
-          class="px-4 py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-semibold text-white transition-colors"
-        >
-          {{ initialSlide ? 'Update Slide' : 'Add Slide' }}
-        </button>
-      </div>
     </div>
+
+    <template #footer>
+      <button
+        @click="$emit('close')"
+        class="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg transition-colors"
+      >
+        Cancel
+      </button>
+      <button
+        @click="addSlide"
+        :disabled="!videoId"
+        class="px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        :class="videoId ? 'bg-gold-500 hover:bg-gold-600 text-black' : 'bg-neutral-600 text-neutral-400'"
+      >
+        {{ initialSlide ? 'Update Slide' : 'Add Slide' }}
+      </button>
+    </template>
   </Modal>
 </template>
 

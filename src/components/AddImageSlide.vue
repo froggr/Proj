@@ -7,6 +7,17 @@
         </label>
         <div class="space-y-3">
           <button
+            v-if="isLibraryOpen"
+            @click="showAssetPicker = true"
+            class="w-full px-4 py-3 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg text-white transition-colors flex items-center justify-center gap-2"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+            Browse Library
+          </button>
+          <button
+            v-else
             @click="selectFile"
             class="w-full px-4 py-3 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg text-white transition-colors flex items-center justify-center gap-2"
           >
@@ -52,13 +63,13 @@
         />
       </div>
 
-      <div v-if="imageUrl || selectedFile" class="space-y-2">
+      <div v-if="imageUrl || selectedFile || selectedAsset" class="space-y-2">
         <label class="block text-sm font-medium text-gray-300">
           Preview
         </label>
         <div class="bg-black rounded-lg overflow-hidden">
           <img
-            :src="imageUrl || `local-image://${selectedFile}`"
+            :src="getPreviewUrl()"
             class="w-full h-auto"
             @error="handleImageError"
           />
@@ -78,7 +89,7 @@
         </button>
         <button
           @click="addSlide"
-          :disabled="!imageUrl && !selectedFile"
+          :disabled="!imageUrl && !selectedFile && !selectedAsset"
           class="px-4 py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-semibold text-white transition-colors"
         >
           Add Slide
@@ -86,21 +97,42 @@
       </div>
     </div>
   </Modal>
+
+  <!-- Asset Picker -->
+  <AssetPicker
+    :show="showAssetPicker"
+    :library-root="libraryRoot"
+    :asset-type="'image'"
+    :title="'Select Image'"
+    @close="showAssetPicker = false"
+    @select="handleAssetSelect"
+  />
 </template>
 
 <script setup>
 import { ref } from 'vue'
 import Modal from './Modal.vue'
+import AssetPicker from './AssetPicker.vue'
 
 const emit = defineEmits(['close', 'add'])
 
-defineProps({
-  show: Boolean
+const props = defineProps({
+  show: Boolean,
+  libraryRoot: {
+    type: String,
+    default: null
+  },
+  isLibraryOpen: {
+    type: Boolean,
+    default: false
+  }
 })
 
 const imageUrl = ref('')
 const selectedFile = ref('')
 const selectedFiles = ref([])  // For multiple files
+const selectedAsset = ref(null)  // Asset from library
+const showAssetPicker = ref(false)
 const title = ref('')
 const error = ref('')
 
@@ -135,9 +167,37 @@ function handleImageError() {
   error.value = 'Failed to load image. Please check the URL or file path.'
 }
 
+function handleAssetSelect(asset) {
+  selectedAsset.value = asset
+  imageUrl.value = ''
+  selectedFile.value = ''
+  selectedFiles.value = []
+  error.value = ''
+}
+
+function getPreviewUrl() {
+  if (selectedAsset.value) {
+    return `file://${selectedAsset.value.path}`
+  } else if (imageUrl.value) {
+    return imageUrl.value
+  } else if (selectedFile.value) {
+    return `local-image://${selectedFile.value}`
+  }
+  return ''
+}
+
 function addSlide() {
-  // If multiple files selected, create multiple slides
-  if (selectedFiles.value.length > 1) {
+  // If library asset selected
+  if (selectedAsset.value) {
+    const slide = {
+      type: 'image',
+      imageUrl: selectedAsset.value.url,  // This will be assets://...
+      title: title.value || selectedAsset.value.filename
+    }
+    emit('add', slide)
+  }
+  // If multiple files selected
+  else if (selectedFiles.value.length > 1) {
     selectedFiles.value.forEach((filePath, index) => {
       const slide = {
         type: 'image',
@@ -146,8 +206,9 @@ function addSlide() {
       }
       emit('add', slide)
     })
-  } else {
-    // Single slide
+  }
+  // Single file or URL
+  else {
     const slide = {
       type: 'image',
       imageUrl: imageUrl.value || `local-image://${selectedFile.value}`,
@@ -160,6 +221,7 @@ function addSlide() {
   imageUrl.value = ''
   selectedFile.value = ''
   selectedFiles.value = []
+  selectedAsset.value = null
   title.value = ''
   error.value = ''
 }

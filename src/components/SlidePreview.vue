@@ -28,7 +28,7 @@
 
         <div v-else-if="slide && slide.type === 'image'" :key="`image-${slide.imageUrl}`" class="w-full h-full">
           <img
-            :src="slide.imageUrl"
+            :src="resolvedImageUrl || slide.imageUrl"
             :alt="slide.title"
             class="w-full h-full object-contain"
             loading="lazy"
@@ -100,7 +100,7 @@
           <video
             ref="videoRef"
             :key="slide.videoUrl"
-            :src="slide.videoUrl"
+            :src="resolvedVideoUrl || slide.videoUrl"
             class="max-w-full max-h-full"
             :controls="!isProjector"
             :autoplay="isProjector"
@@ -164,6 +164,10 @@ const props = defineProps({
   transitionType: {
     type: String,
     default: 'none'
+  },
+  libraryRoot: {
+    type: String,
+    default: null
   }
 })
 
@@ -173,6 +177,39 @@ const videoRef = ref(null)
 const youtubeVideoEnded = ref(false)
 const youtubeOverlayOpacity = ref(0)
 const youtubePlayerState = ref(null) // Track state to avoid duplicate events
+const resolvedImageUrl = ref(null)
+const resolvedVideoUrl = ref(null)
+
+// Resolve assets:// URLs to local-image:// URLs
+async function resolveAssetUrl(assetUrl) {
+  if (!assetUrl || !assetUrl.startsWith('assets://')) {
+    return assetUrl
+  }
+
+  if (!props.libraryRoot || !window.electronAPI) {
+    console.warn('Cannot resolve asset URL: library not open or Electron API not available')
+    return assetUrl
+  }
+
+  try {
+    // resolveAssetPath now returns local-image:// URLs directly
+    const resolvedUrl = await window.electronAPI.resolveAssetPath(props.libraryRoot, assetUrl)
+    return resolvedUrl || assetUrl
+  } catch (error) {
+    console.error('Failed to resolve asset URL:', error)
+    return assetUrl
+  }
+}
+
+// Watch for slide changes and resolve URLs
+watch(() => props.slide, async (newSlide) => {
+  if (newSlide?.type === 'image' && newSlide.imageUrl) {
+    resolvedImageUrl.value = await resolveAssetUrl(newSlide.imageUrl)
+  }
+  if (newSlide?.type === 'video' && newSlide.videoUrl) {
+    resolvedVideoUrl.value = await resolveAssetUrl(newSlide.videoUrl)
+  }
+}, { immediate: true })
 
 // YouTube iframe API
 const youtubeUrl = computed(() => {

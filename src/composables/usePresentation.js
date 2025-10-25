@@ -5,7 +5,13 @@ import { ref, computed, watch } from 'vue'
 //   {
 //     id: '1',
 //     title: 'Welcome',
-//     autoAdvance: { enabled: false, type: 'manual', delay: 5000, repeat: false },
+//     autoAdvance: {
+//       enabled: false,
+//       delay: 5000,
+//       videoAdvance: 'video-end', // 'video-end' or 'timer' (uses delay above)
+//       repeat: false,
+//       transition: 'fade'
+//     },
 //     slides: [
 //       { type: 'image', imageUrl: '...', title: 'Welcome 1' },
 //       { type: 'custom', html: '...', background: '#000', title: 'Welcome 2' }
@@ -13,36 +19,7 @@ import { ref, computed, watch } from 'vue'
 //   }
 // ]
 
-const stacks = ref([
-  {
-    id: '1',
-    title: 'Welcome',
-    autoAdvance: { enabled: false, type: 'manual', delay: 5000, repeat: false, transition: 'fade' },
-    slides: [
-      {
-        type: 'image',
-        imageUrl: 'https://via.placeholder.com/1920x1080/1a1a1a/ffffff?text=Welcome+to+Church',
-        title: 'Welcome'
-      }
-    ]
-  },
-  {
-    id: '2',
-    title: 'Scripture',
-    autoAdvance: { enabled: false, type: 'manual', delay: 5000, repeat: false, transition: 'fade' },
-    slides: [
-      {
-        type: 'bible',
-        reference: 'John 3:16-17',
-        text: 'For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life. For God did not send his Son into the world to condemn the world, but to save the world through him.',
-        translation: 'NIV',
-        linesPerSlide: 3,
-        font: 'Inter',
-        background: '#1a1a1a'
-      }
-    ]
-  }
-])
+const stacks = ref([])
 
 // Current staged stack and slide
 const stagedStackIndex = ref(0)
@@ -51,6 +28,9 @@ const stagedSlideIndex = ref(0)
 // Current live stack and slide
 const liveStackIndex = ref(null)
 const liveSlideIndex = ref(null)
+
+// Library root for resolving asset URLs
+const libraryRoot = ref(null)
 
 let watchInitialized = false
 let debounceTimer = null
@@ -66,7 +46,8 @@ function updateProjector(liveSlide, transitionType = 'none') {
     try {
       const projectorData = {
         slide: liveSlide,
-        transition: transitionType
+        transition: transitionType,
+        libraryRoot: libraryRoot.value
       }
       const dataJson = JSON.stringify(projectorData)
       console.log('Control: Sending to projector:', dataJson)
@@ -137,33 +118,53 @@ export function usePresentation() {
     const stack = stacks.value[stackIndex]
     if (!stack || !stack.autoAdvance.enabled) return
 
-    const { type, delay, repeat } = stack.autoAdvance
     const currentSlide = stack.slides[slideIndex]
+    const { repeat, delay, videoAdvance } = stack.autoAdvance
 
-    if (type === 'timer') {
+    // For videos and YouTube, check if they should use timer or wait for video end
+    if (currentSlide.type === 'video' || currentSlide.type === 'youtube') {
+      if (videoAdvance === 'timer') {
+        // Use timer for videos too
+        autoAdvanceTimer = setTimeout(() => {
+          goNextSlideInLiveStack(repeat)
+        }, delay)
+      } else if (videoAdvance === 'video-end') {
+        // Wait for video to end - handled by onVideoComplete callback
+        // No timer needed
+      }
+    } else {
+      // For images, bible verses, custom slides - always use timer
       autoAdvanceTimer = setTimeout(() => {
         goNextSlideInLiveStack(repeat)
       }, delay)
-    } else if (type === 'video-end') {
-      // Video-end auto-advance is handled by onVideoComplete callback
-      // No timer needed - will advance when video emits ended event
-    } else if (type === 'youtube-end') {
-      // YouTube-end auto-advance is handled by onYouTubeComplete callback
-      // No timer needed - will advance when YouTube video ends
     }
   }
 
   // Called when a video completes playing
   function onVideoComplete() {
-    if (liveStackIndex.value === null) return
+    if (liveStackIndex.value === null || liveSlideIndex.value === null) return
 
     const stack = stacks.value[liveStackIndex.value]
     if (!stack || !stack.autoAdvance.enabled) return
 
-    const { type, repeat } = stack.autoAdvance
-    console.log('onVideoComplete:', { stackIndex: liveStackIndex.value, slideIndex: liveSlideIndex.value, type, repeat, totalSlides: stack.slides.length })
+    const currentSlide = stack.slides[liveSlideIndex.value]
+    const { repeat, videoAdvance } = stack.autoAdvance
 
-    if (type === 'video-end' || type === 'youtube-end') {
+    // Only advance if it's a video/youtube slide and videoAdvance is set to 'video-end'
+    const isVideoSlide = currentSlide.type === 'video' || currentSlide.type === 'youtube'
+    const shouldAdvance = isVideoSlide && videoAdvance === 'video-end'
+
+    console.log('onVideoComplete:', {
+      stackIndex: liveStackIndex.value,
+      slideIndex: liveSlideIndex.value,
+      slideType: currentSlide.type,
+      videoAdvance,
+      shouldAdvance,
+      repeat,
+      totalSlides: stack.slides.length
+    })
+
+    if (shouldAdvance) {
       goNextSlideInLiveStack(repeat)
       console.log('After advance:', { stackIndex: liveStackIndex.value, slideIndex: liveSlideIndex.value })
     }
@@ -262,7 +263,13 @@ export function usePresentation() {
     const newStack = {
       id: Date.now().toString(),
       title,
-      autoAdvance: { enabled: false, type: 'manual', delay: 5000, repeat: false, transition: 'fade' },
+      autoAdvance: {
+        enabled: false,
+        delay: 5000,
+        videoAdvance: 'video-end', // 'video-end' or 'timer'
+        repeat: false,
+        transition: 'fade'
+      },
       slides: []
     }
     stacks.value.push(newStack)
@@ -356,6 +363,10 @@ export function usePresentation() {
     stagedSlideIndex,
     liveStackIndex,
     liveSlideIndex,
+    libraryRoot,
+
+    // Library management
+    setLibraryRoot: (path) => { libraryRoot.value = path },
 
     // Navigation constraints
     canGoPrevSlide,

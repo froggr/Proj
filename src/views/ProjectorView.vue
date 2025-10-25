@@ -3,6 +3,7 @@
     <SlidePreview
       :slide="liveSlide"
       :is-projector="true"
+      :library-root="libraryRoot"
       :transitionType="transitionType"
       @video-ended="onVideoEnded"
       @youtube-ended="onYouTubeEnded"
@@ -18,6 +19,7 @@ console.log('ProjectorView: Script loading')
 
 const liveSlide = ref(null)
 const transitionType = ref('none')
+const libraryRoot = ref(null)
 
 // Watch for slide changes to debug
 watch(liveSlide, (newSlide) => {
@@ -37,10 +39,11 @@ onMounted(() => {
         console.log('ProjectorView: Received slide data:', slideData)
         const data = typeof slideData === 'string' ? JSON.parse(slideData) : slideData
 
-        // Handle both old format (just slide) and new format (slide + transition)
+        // Handle both old format (just slide) and new format (slide + transition + libraryRoot)
         if (data && typeof data === 'object' && 'slide' in data) {
           liveSlide.value = data.slide
           transitionType.value = data.transition || 'none'
+          libraryRoot.value = data.libraryRoot || null
         } else {
           // Backward compatibility: treat as just a slide
           liveSlide.value = data

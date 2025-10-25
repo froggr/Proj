@@ -26,5 +26,19 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // Window controls
   windowMinimize: () => ipcRenderer.invoke("window-minimize"),
   windowMaximize: () => ipcRenderer.invoke("window-maximize"),
-  windowClose: () => ipcRenderer.invoke("window-close")
+  windowClose: () => ipcRenderer.invoke("window-close"),
+  // Library management
+  createLibrary: (parentPath, libraryName) => ipcRenderer.invoke("create-library", parentPath, libraryName),
+  loadLibraryMetadata: (libPath) => ipcRenderer.invoke("load-library-metadata", libPath),
+  saveLibraryMetadata: (libPath, metadata) => ipcRenderer.invoke("save-library-metadata", libPath, metadata),
+  listLibraryEvents: (libPath) => ipcRenderer.invoke("list-library-events", libPath),
+  createLibraryEvent: (libPath, eventName) => ipcRenderer.invoke("create-library-event", libPath, eventName),
+  loadLibraryEvent: (libPath, eventName) => ipcRenderer.invoke("load-library-event", libPath, eventName),
+  saveLibraryEvent: (eventPath, data) => ipcRenderer.invoke("save-library-event", eventPath, data),
+  deleteLibraryEvent: (libPath, eventName) => ipcRenderer.invoke("delete-library-event", libPath, eventName),
+  resolveAssetPath: (libPath, assetUrl) => ipcRenderer.invoke("resolve-asset-path", libPath, assetUrl),
+  selectLibraryFolder: () => ipcRenderer.invoke("select-library-folder"),
+  // Asset management
+  listLibraryAssets: (libPath) => ipcRenderer.invoke("list-library-assets", libPath),
+  importAssetsToLibrary: (libPath, assetType) => ipcRenderer.invoke("import-assets-to-library", libPath, assetType)
 });

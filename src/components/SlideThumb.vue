@@ -9,7 +9,7 @@
   >
     <div class="aspect-video w-full bg-gray-900 flex items-center justify-center p-4">
       <div v-if="slide.type === 'image'" class="w-full h-full flex items-center justify-center">
-        <img :src="slide.imageUrl" :alt="slide.title" class="max-w-full max-h-full object-contain" />
+        <img :src="resolvedImageUrl || slide.imageUrl" :alt="slide.title" class="max-w-full max-h-full object-contain" />
       </div>
       <div v-else-if="slide.type === 'bible'" class="text-center text-xs text-gray-300">
         <div class="font-semibold mb-1">{{ slide.reference }}</div>
@@ -40,7 +40,9 @@
 </template>
 
 <script setup>
-defineProps({
+import { ref, watch } from 'vue'
+
+const props = defineProps({
   slide: {
     type: Object,
     required: true
@@ -52,8 +54,40 @@ defineProps({
   isLive: {
     type: Boolean,
     default: false
+  },
+  libraryRoot: {
+    type: String,
+    default: null
   }
 })
 
 defineEmits(['click'])
+
+const resolvedImageUrl = ref(null)
+
+// Resolve assets:// URLs to local-image:// URLs
+async function resolveAssetUrl(assetUrl) {
+  if (!assetUrl || !assetUrl.startsWith('assets://')) {
+    return assetUrl
+  }
+
+  if (!props.libraryRoot || !window.electronAPI) {
+    return assetUrl
+  }
+
+  try {
+    const resolvedUrl = await window.electronAPI.resolveAssetPath(props.libraryRoot, assetUrl)
+    return resolvedUrl || assetUrl
+  } catch (error) {
+    console.error('Failed to resolve asset URL:', error)
+    return assetUrl
+  }
+}
+
+// Watch for slide changes and resolve URLs
+watch(() => props.slide, async (newSlide) => {
+  if (newSlide?.type === 'image' && newSlide.imageUrl) {
+    resolvedImageUrl.value = await resolveAssetUrl(newSlide.imageUrl)
+  }
+}, { immediate: true })
 </script>

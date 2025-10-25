@@ -7,6 +7,17 @@
         </label>
         <div class="space-y-3">
           <button
+            v-if="isLibraryOpen"
+            @click="showAssetPicker = true"
+            class="w-full px-4 py-3 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg text-white transition-colors flex items-center justify-center gap-2"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+            Browse Library
+          </button>
+          <button
+            v-else
             @click="selectFile"
             class="w-full px-4 py-3 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg text-white transition-colors flex items-center justify-center gap-2"
           >
@@ -34,9 +45,9 @@
         </div>
       </div>
 
-      <div v-if="selectedFile">
+      <div v-if="selectedFile || selectedAsset">
         <p class="text-sm text-gray-400">
-          Selected: <span class="text-white font-medium">{{ selectedFile }}</span>
+          Selected: <span class="text-white font-medium">{{ selectedAsset ? selectedAsset.filename : selectedFile }}</span>
         </p>
       </div>
 
@@ -52,13 +63,13 @@
         />
       </div>
 
-      <div v-if="videoUrl || selectedFile" class="space-y-2">
+      <div v-if="videoUrl || selectedFile || selectedAsset" class="space-y-2">
         <label class="block text-sm font-medium text-gray-300">
           Preview
         </label>
         <div class="bg-black rounded-lg overflow-hidden aspect-video">
           <video
-            :src="videoUrl || `asset://localhost/${selectedFile}`"
+            :src="getPreviewUrl()"
             class="w-full h-full"
             controls
             @error="handleVideoError"
@@ -79,7 +90,7 @@
         </button>
         <button
           @click="addSlide"
-          :disabled="!videoUrl && !selectedFile"
+          :disabled="!videoUrl && !selectedFile && !selectedAsset"
           class="px-4 py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-semibold text-white transition-colors"
         >
           Add Slide
@@ -87,40 +98,54 @@
       </div>
     </div>
   </Modal>
+
+  <!-- Asset Picker -->
+  <AssetPicker
+    :show="showAssetPicker"
+    :library-root="libraryRoot"
+    :asset-type="'video'"
+    :title="'Select Video'"
+    @close="showAssetPicker = false"
+    @select="handleAssetSelect"
+  />
 </template>
 
 <script setup>
 import { ref } from 'vue'
 import Modal from './Modal.vue'
+import AssetPicker from './AssetPicker.vue'
 
 const emit = defineEmits(['close', 'add'])
 
-defineProps({
-  show: Boolean
+const props = defineProps({
+  show: Boolean,
+  libraryRoot: {
+    type: String,
+    default: null
+  },
+  isLibraryOpen: {
+    type: Boolean,
+    default: false
+  }
 })
 
 const videoUrl = ref('')
 const selectedFile = ref('')
+const selectedAsset = ref(null)
+const showAssetPicker = ref(false)
 const title = ref('')
 const error = ref('')
 
 async function selectFile() {
   try {
-    const { open } = await import('@tauri-apps/plugin-dialog')
-
-    const file = await open({
-      multiple: false,
-      filters: [{
-        name: 'Videos',
-        extensions: ['mp4', 'webm', 'avi', 'mov', 'mkv', 'flv', 'wmv', 'm4v']
-      }]
-    })
-
-    if (file) {
-      selectedFile.value = file
-      videoUrl.value = '' // Clear URL if file is selected
-      error.value = ''
+    if (!window.electronAPI) {
+      error.value = 'File dialog not available (Electron API not loaded)'
+      return
     }
+
+    // Note: We should add a selectVideos method to electronAPI similar to selectImages
+    // For now, fall back to generic file selection
+    error.value = 'Please use the library to add videos, or enter a video URL.'
   } catch (err) {
     error.value = `Failed to select file: ${err.message}`
     console.error('File selection error:', err)
@@ -131,18 +156,48 @@ function handleVideoError() {
   error.value = 'Failed to load video. Please check the URL or file path. Make sure you have the necessary codecs installed.'
 }
 
-function addSlide() {
-  const slide = {
-    type: 'video',
-    videoUrl: videoUrl.value || `asset://localhost/${selectedFile.value}`,
-    title: title.value || 'Video Slide'
-  }
+function handleAssetSelect(asset) {
+  selectedAsset.value = asset
+  videoUrl.value = ''
+  selectedFile.value = ''
+  error.value = ''
+}
 
-  emit('add', slide)
+function getPreviewUrl() {
+  if (selectedAsset.value) {
+    return `file://${selectedAsset.value.path}`
+  } else if (videoUrl.value) {
+    return videoUrl.value
+  } else if (selectedFile.value) {
+    return `file://${selectedFile.value}`
+  }
+  return ''
+}
+
+function addSlide() {
+  // If library asset selected
+  if (selectedAsset.value) {
+    const slide = {
+      type: 'video',
+      videoUrl: selectedAsset.value.url,  // This will be assets://...
+      title: title.value || selectedAsset.value.filename
+    }
+    emit('add', slide)
+  }
+  // Single file or URL
+  else {
+    const slide = {
+      type: 'video',
+      videoUrl: videoUrl.value || `file://${selectedFile.value}`,
+      title: title.value || 'Video Slide'
+    }
+    emit('add', slide)
+  }
 
   // Reset
   videoUrl.value = ''
   selectedFile.value = ''
+  selectedAsset.value = null
   title.value = ''
   error.value = ''
 }

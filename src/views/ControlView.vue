@@ -45,27 +45,80 @@
     </div>
 
     <!-- Top Bar (Toolbar) -->
-    <div class="px-6 py-2 flex items-center justify-between border-b border-neutral-800 bg-neutral-900/50 backdrop-blur" style="flex-shrink: 0;">
+    <div class="px-6 py-2 flex items-center justify-between border-b border-neutral-800 bg-neutral-900/50 backdrop-blur relative z-50" style="flex-shrink: 0;">
       <div class="flex items-center gap-4">
         <div class="flex gap-2">
+          <!-- File menu (for library management) -->
+          <div class="relative z-[200]">
+            <button
+              @click="showFileMenu = !showFileMenu"
+              class="px-3 py-1.5 text-xs font-medium text-neutral-400 hover:text-gold-500 hover:bg-neutral-800 rounded-lg transition-all flex items-center gap-1"
+            >
+              File
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <div v-if="showFileMenu" class="absolute top-full left-0 mt-1 bg-neutral-800 border border-neutral-700 rounded-lg shadow-xl py-1 min-w-[140px] z-[200]">
+              <button
+                @click="showNewLibraryDialog = true; showFileMenu = false"
+                class="w-full px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-700 hover:text-gold-500 transition-all text-left"
+              >
+                New Library...
+              </button>
+              <button
+                @click="showOpenLibraryDialog = true; showFileMenu = false"
+                class="w-full px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-700 hover:text-gold-500 transition-all text-left"
+              >
+                Open Library...
+              </button>
+              <div v-if="isLibraryOpen" class="border-t border-neutral-700 my-1"></div>
+              <button
+                v-if="isLibraryOpen"
+                @click="handleCloseLibrary(); showFileMenu = false"
+                class="w-full px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-700 hover:text-gold-500 transition-all text-left"
+              >
+                Close Library
+              </button>
+            </div>
+          </div>
+
+          <!-- New Event (simple button) -->
           <button
-            @click="newPresentation"
-            class="px-3 py-1.5 text-xs font-medium text-neutral-400 hover:text-gold-500 hover:bg-neutral-800 rounded-lg transition-all"
+            @click="newPresentation()"
+            :disabled="!isLibraryOpen"
+            class="px-3 py-1.5 text-xs font-medium text-neutral-400 hover:text-gold-500 hover:bg-neutral-800 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            :title="!isLibraryOpen ? 'Open a library first' : 'Create new event'"
           >
             New
           </button>
+
+          <!-- Load Event (simple button) -->
           <button
-            @click="loadPresentation"
-            class="px-3 py-1.5 text-xs font-medium text-neutral-400 hover:text-gold-500 hover:bg-neutral-800 rounded-lg transition-all"
+            @click="showSelectEventDialog = true"
+            :disabled="!isLibraryOpen"
+            class="px-3 py-1.5 text-xs font-medium text-neutral-400 hover:text-gold-500 hover:bg-neutral-800 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            :title="!isLibraryOpen ? 'Open a library first' : 'Load an event'"
           >
             Load
           </button>
+
           <button
             @click="savePresentation"
             class="px-3 py-1.5 text-xs font-medium text-neutral-400 hover:text-gold-500 hover:bg-neutral-800 rounded-lg transition-all"
           >
             Save
           </button>
+        </div>
+
+        <!-- Library/Event Status Indicator -->
+        <div v-if="isLibraryOpen" class="flex items-center gap-2 text-xs text-neutral-500 ml-4">
+          <span class="text-gold-500 font-medium">{{ libraryMetadata?.name || 'Library' }}</span>
+          <span v-if="currentEventName">•</span>
+          <span v-if="currentEventName">{{ currentEventName }}</span>
+          <span v-if="currentEventName">•</span>
+          <span v-if="saveStatus === 'saving'" class="text-neutral-400">Saving...</span>
+          <span v-else-if="saveStatus === 'saved'" class="text-green-500">✓ Saved {{ lastSaveTime }}</span>
         </div>
       </div>
 
@@ -101,8 +154,9 @@
           <h2 class="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Stacks</h2>
           <button
             @click="addNewStack"
-            class="p-1 bg-gold-500/10 hover:bg-gold-500/20 rounded-lg text-gold-500 transition-all"
-            title="Add Stack"
+            :disabled="!isEventOpen"
+            class="p-1 bg-gold-500/10 hover:bg-gold-500/20 rounded-lg text-gold-500 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            :title="!isEventOpen ? 'Open or create an event first' : 'Add Stack'"
           >
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -247,11 +301,22 @@
               <!-- Add Slide Button -->
               <button
                 @click="openAddSlideMenu(stackIndex)"
-                class="w-full px-2 py-1 text-[10px] text-neutral-500 hover:text-gold-500 hover:bg-neutral-700/30 rounded-md transition-all"
+                :disabled="!isEventOpen"
+                class="w-full px-2 py-1 text-[10px] text-neutral-500 hover:text-gold-500 hover:bg-neutral-700/30 rounded-md transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                :title="!isEventOpen ? 'Open or create an event first' : 'Add slide to this stack'"
               >
                 + Add Slide
               </button>
             </div>
+          </div>
+
+          <!-- Empty state when no stacks or event -->
+          <div v-if="stacks.length === 0" class="flex flex-col items-center justify-center text-center p-6 text-neutral-500">
+            <svg class="w-12 h-12 mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <p class="text-sm mb-1">No stacks yet</p>
+            <p v-if="!isEventOpen" class="text-xs text-neutral-600">Open or create an event to get started</p>
           </div>
         </div>
       </div>
@@ -314,6 +379,7 @@
             <SlidePreview
               :slide="currentSlide"
               :isStaged="true"
+              :library-root="libraryRoot"
               :transitionType="currentStack?.autoAdvance?.transition || 'none'"
               @video-ended="onVideoComplete"
               @youtube-ended="onVideoComplete"
@@ -336,6 +402,7 @@
           <SlidePreview
             :slide="liveSlide"
             :scale="0.2"
+            :library-root="libraryRoot"
             :transitionType="liveStack?.autoAdvance?.transition || 'none'"
             @video-ended="onVideoComplete"
             @youtube-ended="onVideoComplete"
@@ -375,7 +442,7 @@
               ]"
             >
               <div class="w-full h-full bg-black relative">
-                <SlidePreview :slide="slide" :scale="0.1" />
+                <SlidePreview :slide="slide" :scale="0.1" :library-root="libraryRoot" />
                 <div class="absolute bottom-0.5 left-0.5 px-1 py-0.5 bg-black/80 text-[9px] text-neutral-400 font-medium rounded">
                   {{ index + 1 }}
                 </div>
@@ -469,15 +536,23 @@
       @close="closeYouTubeDialog"
       @add="handleAddOrUpdateSlide"
     />
-    <AddImageSlide
-      :show="showImageDialog"
-      @close="showImageDialog = false"
-      @add="handleAddSlide"
+    <AssetPicker
+      :show="showImageAssetPicker"
+      :library-root="libraryRoot"
+      :asset-type="'image'"
+      :title="'Select Images'"
+      :multi-select="true"
+      @close="showImageAssetPicker = false"
+      @select="handleImageAssetSelected"
     />
-    <AddLocalVideoSlide
-      :show="showVideoDialog"
-      @close="showVideoDialog = false"
-      @add="handleAddSlide"
+    <AssetPicker
+      :show="showVideoAssetPicker"
+      :library-root="libraryRoot"
+      :asset-type="'video'"
+      :title="'Select Videos'"
+      :multi-select="true"
+      @close="showVideoAssetPicker = false"
+      @select="handleVideoAssetSelected"
     />
 
     <!-- Stack Settings Dialog -->
@@ -495,82 +570,86 @@
           </label>
         </div>
 
-        <div v-if="stackSettingsForm.enabled" class="space-y-4 pl-7">
-          <div>
-            <label class="block text-sm font-medium text-neutral-300 mb-2">
-              Advance Type
-            </label>
-            <select
-              v-model="stackSettingsForm.type"
-              class="w-full px-4 py-2 border border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-500"
-              style="background-color: #171717; color: white;"
-            >
-              <option value="manual">Manual (No Auto-Advance)</option>
-              <option value="timer">Timer (Fixed Interval)</option>
-              <option value="video-end">Video End (Advance After Video)</option>
-              <option value="youtube-end">YouTube End (Advance After YouTube)</option>
-            </select>
-            <p class="mt-2 text-xs text-neutral-400">YouTube auto-advance: video will fade to black on completion</p>
+        <div v-if="stackSettingsForm.enabled" class="space-y-6 pl-7">
+          <!-- Timer Delay -->
+          <div class="border border-neutral-700 rounded-lg p-4 space-y-3 bg-neutral-800/30">
+            <h4 class="text-sm font-semibold text-neutral-200">Timer Delay</h4>
+            <div>
+              <label class="block text-sm font-medium text-neutral-300 mb-2">
+                Advance After (seconds)
+              </label>
+              <input
+                :value="Math.round(stackSettingsForm.delay / 1000)"
+                @input="stackSettingsForm.delay = $event.target.value * 1000"
+                type="number"
+                min="1"
+                max="300"
+                step="1"
+                class="w-full px-4 py-2 bg-neutral-800 border border-neutral-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-gold-500"
+              />
+              <p class="mt-1 text-xs text-neutral-400">Time between slides (images, text, Bible verses)</p>
+            </div>
           </div>
 
-          <div v-if="stackSettingsForm.type === 'timer'">
-            <label class="block text-sm font-medium text-neutral-300 mb-2">
-              Delay (seconds)
-            </label>
-            <input
-              :value="Math.round(stackSettingsForm.delay / 1000)"
-              @input="stackSettingsForm.delay = $event.target.value * 1000"
-              type="number"
-              min="1"
-              max="300"
-              step="1"
-              class="w-full px-4 py-2 bg-neutral-800 border border-neutral-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-gold-500"
-            />
-            <p class="mt-1 text-xs text-neutral-400">Time between slide advances</p>
+          <!-- Video/YouTube Behavior -->
+          <div class="border border-neutral-700 rounded-lg p-4 space-y-3 bg-neutral-800/30">
+            <h4 class="text-sm font-semibold text-neutral-200">Video & YouTube Slides</h4>
+            <div>
+              <select
+                v-model="stackSettingsForm.videoAdvance"
+                class="w-full px-4 py-2 bg-neutral-800 border border-neutral-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-gold-500"
+              >
+                <option value="video-end">Advance When Video Ends</option>
+                <option value="timer">Use Timer Above</option>
+              </select>
+              <p class="mt-2 text-xs text-neutral-400">Videos will fade to black on completion</p>
+            </div>
           </div>
 
-          <div class="flex items-center gap-3">
-            <input
-              v-model="stackSettingsForm.repeat"
-              type="checkbox"
-              id="autoAdvanceRepeat"
-              class="w-4 h-4 rounded border-neutral-600 bg-neutral-800 text-gold-500 focus:ring-gold-500 focus:ring-offset-neutral-900"
-            />
-            <label for="autoAdvanceRepeat" class="text-sm text-neutral-300">
-              Repeat (Loop back to first slide)
-            </label>
-          </div>
+          <!-- Global Settings -->
+          <div class="space-y-3">
+            <div class="flex items-center gap-3">
+              <input
+                v-model="stackSettingsForm.repeat"
+                type="checkbox"
+                id="autoAdvanceRepeat"
+                class="w-4 h-4 rounded border-neutral-600 bg-neutral-800 text-gold-500 focus:ring-gold-500 focus:ring-offset-neutral-900"
+              />
+              <label for="autoAdvanceRepeat" class="text-sm text-neutral-300">
+                Repeat (Loop back to first slide)
+              </label>
+            </div>
 
-          <div>
-            <label class="block text-sm font-medium text-neutral-300 mb-2">
-              Slide Transition Effect
-            </label>
-            <select
-              v-model="stackSettingsForm.transition"
-              class="w-full px-4 py-2 border border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-500"
-              style="background-color: #171717; color: white;"
-            >
-              <option value="instant">Instant</option>
-              <option value="fade">Fade (500ms)</option>
-            </select>
+            <div>
+              <label class="block text-sm font-medium text-neutral-300 mb-2">
+                Slide Transition Effect
+              </label>
+              <select
+                v-model="stackSettingsForm.transition"
+                class="w-full px-4 py-2 bg-neutral-800 border border-neutral-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-gold-500"
+              >
+                <option value="instant">Instant</option>
+                <option value="fade">Fade (500ms)</option>
+              </select>
+            </div>
           </div>
-        </div>
-
-        <div class="flex gap-3 justify-end pt-4">
-          <button
-            @click="showStackSettings = false"
-            class="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 rounded-lg font-semibold text-neutral-200 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            @click="saveStackSettings"
-            class="px-4 py-2 bg-gold-500 hover:bg-gold-400 rounded-lg font-semibold text-black transition-colors"
-          >
-            Save Settings
-          </button>
         </div>
       </div>
+
+      <template #footer>
+        <button
+          @click="showStackSettings = false"
+          class="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          @click="saveStackSettings"
+          class="px-4 py-2 bg-gold-500 hover:bg-gold-600 text-black rounded-lg transition-colors"
+        >
+          Save Settings
+        </button>
+      </template>
     </Modal>
 
     <!-- Input Dialog for New Stack -->
@@ -626,27 +705,60 @@
         </div>
       </div>
     </Modal>
+
+    <!-- Library Dialogs -->
+    <NewLibraryDialog
+      :show="showNewLibraryDialog"
+      @close="showNewLibraryDialog = false"
+      @create="handleCreateLibrary"
+    />
+    <OpenLibraryDialog
+      :show="showOpenLibraryDialog"
+      @close="showOpenLibraryDialog = false"
+      @open-library="handleOpenLibrary"
+      @open-event="handleOpenEvent"
+      @new-event="handleNewEventFromDialog"
+      @delete-event="handleDeleteEvent"
+    />
+    <SelectEventDialog
+      :show="showSelectEventDialog"
+      :library-root="libraryRoot"
+      @close="showSelectEventDialog = false"
+      @select-event="handleOpenEvent"
+      @delete-event="handleDeleteEvent"
+    />
+    <NewEventDialog
+      :show="showNewEventDialog"
+      :library-root="libraryRoot"
+      @close="showNewEventDialog = false"
+      @create="handleCreateNewEvent"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted, toRaw } from 'vue'
 import { usePresentation } from '../composables/usePresentation'
 import { useKeyboard } from '../composables/useKeyboard'
 import { useProjector } from '../composables/useProjector'
+import { useLibrary } from '../composables/useLibrary'
 import SlidePreview from '../components/SlidePreview.vue'
 import Modal from '../components/Modal.vue'
 import CustomSlideEditor from '../components/CustomSlideEditor.vue'
 import AddBibleSlide from '../components/AddBibleSlide.vue'
 import AddYouTubeSlide from '../components/AddYouTubeSlide.vue'
-import AddImageSlide from '../components/AddImageSlide.vue'
-import AddLocalVideoSlide from '../components/AddLocalVideoSlide.vue'
+import AssetPicker from '../components/AssetPicker.vue'
 import InputDialog from '../components/InputDialog.vue'
+import NewLibraryDialog from '../components/NewLibraryDialog.vue'
+import OpenLibraryDialog from '../components/OpenLibraryDialog.vue'
+import SelectEventDialog from '../components/SelectEventDialog.vue'
+import NewEventDialog from '../components/NewEventDialog.vue'
 
 const {
   stacks,
   currentStack,
   currentSlide,
+  liveStack,
   liveSlide,
   stagedStackIndex,
   stagedSlideIndex,
@@ -667,7 +779,8 @@ const {
   updateStackSettings,
   onVideoComplete,
   savePresentation: savePresentationData,
-  loadPresentation: loadPresentationData
+  loadPresentation: loadPresentationData,
+  setLibraryRoot
 } = usePresentation()
 
 const {
@@ -677,17 +790,41 @@ const {
   closeProjector
 } = useProjector()
 
+const {
+  libraryRoot,
+  libraryMetadata,
+  currentEventName,
+  isLibraryOpen,
+  createLibrary,
+  openLibrary,
+  closeLibrary,
+  getEventsList,
+  createEvent,
+  loadEvent,
+  saveEvent,
+  deleteEvent,
+  getLastLibraryPath
+} = useLibrary()
+
 const aspectRatio = ref('16:9-1080')
 const expandedStacks = reactive({})
 const showCustomDialog = ref(false)
 const showBibleDialog = ref(false)
 const showYouTubeDialog = ref(false)
-const showImageDialog = ref(false)
-const showVideoDialog = ref(false)
+const showImageAssetPicker = ref(false)
+const showVideoAssetPicker = ref(false)
 const showMonitorDialog = ref(false)
 const showAddSlideMenu = ref(false)
 const showStackSettings = ref(false)
 const showInputDialog = ref(false)
+const inputDialogMode = ref('stack') // 'stack' only now
+const showNewLibraryDialog = ref(false)
+const showOpenLibraryDialog = ref(false)
+const showSelectEventDialog = ref(false)
+const showNewEventDialog = ref(false)
+const showFileMenu = ref(false)
+const saveStatus = ref('') // 'saving', 'saved', ''
+const lastSaveTime = ref('')
 const availableMonitors = ref([])
 const selectedMonitor = ref(0)
 const currentStackForAdd = ref(null)
@@ -700,8 +837,8 @@ const menuPosition = reactive({ x: 0, y: 0 })
 // Stack settings form
 const stackSettingsForm = reactive({
   enabled: false,
-  type: 'manual',
   delay: 5000,
+  videoAdvance: 'video-end', // 'video-end' or 'timer'
   repeat: false,
   transition: 'fade'
 })
@@ -721,6 +858,9 @@ const previewStyle = computed(() => {
   }
 })
 
+// Check if an event is currently open
+const isEventOpen = computed(() => currentEventName.value !== null)
+
 // Initialize expanded stacks
 stacks.value.forEach((_, index) => {
   expandedStacks[index] = true
@@ -733,15 +873,20 @@ function toggleStack(stackIndex) {
 
 function addNewStack() {
   console.log('addNewStack called!')
+  inputDialogMode.value = 'stack'
   showInputDialog.value = true
 }
 
-function handleNewStackConfirm(title) {
-  console.log('Stack title entered:', title)
-  if (title) {
-    addStack(title)
-    console.log('Stack added')
+async function handleNewStackConfirm(title) {
+  if (!title) {
+    showInputDialog.value = false
+    return
   }
+
+  // Just creating a new stack
+  console.log('Creating new stack:', title)
+  addStack(title)
+
   showInputDialog.value = false
 }
 
@@ -773,12 +918,60 @@ function openYouTubeDialog() {
 
 function openImageDialog() {
   showAddSlideMenu.value = false
-  showImageDialog.value = true
+  showImageAssetPicker.value = true
 }
 
 function openVideoDialog() {
   showAddSlideMenu.value = false
-  showVideoDialog.value = true
+  showVideoAssetPicker.value = true
+}
+
+function handleImageAssetSelected(assetOrAssets) {
+  // Handle both single asset and array of assets
+  const assets = Array.isArray(assetOrAssets) ? assetOrAssets : [assetOrAssets]
+
+  // Validate asset types
+  const invalidAssets = assets.filter(asset => asset.type !== 'image')
+  if (invalidAssets.length > 0) {
+    console.error('Invalid asset types: expected images only')
+    return
+  }
+
+  // Add each asset as a slide
+  assets.forEach(asset => {
+    const slide = {
+      type: 'image',
+      imageUrl: asset.url,  // This will be assets://...
+      title: asset.filename
+    }
+    handleAddSlide(slide)
+  })
+
+  showImageAssetPicker.value = false
+}
+
+function handleVideoAssetSelected(assetOrAssets) {
+  // Handle both single asset and array of assets
+  const assets = Array.isArray(assetOrAssets) ? assetOrAssets : [assetOrAssets]
+
+  // Validate asset types
+  const invalidAssets = assets.filter(asset => asset.type !== 'video')
+  if (invalidAssets.length > 0) {
+    console.error('Invalid asset types: expected videos only')
+    return
+  }
+
+  // Add each asset as a slide
+  assets.forEach(asset => {
+    const slide = {
+      type: 'video',
+      videoUrl: asset.url,  // This will be assets://...
+      title: asset.filename
+    }
+    handleAddSlide(slide)
+  })
+
+  showVideoAssetPicker.value = false
 }
 
 function handleAddSlide(slide) {
@@ -788,8 +981,8 @@ function handleAddSlide(slide) {
   showCustomDialog.value = false
   showBibleDialog.value = false
   showYouTubeDialog.value = false
-  showImageDialog.value = false
-  showVideoDialog.value = false
+  showImageAssetPicker.value = false
+  showVideoAssetPicker.value = false
 }
 
 function selectSlide(slideIndex) {
@@ -801,8 +994,8 @@ function openStackSettings(stackIndex) {
   const stack = stacks.value[stackIndex]
   if (stack) {
     stackSettingsForm.enabled = stack.autoAdvance.enabled
-    stackSettingsForm.type = stack.autoAdvance.type
     stackSettingsForm.delay = stack.autoAdvance.delay
+    stackSettingsForm.videoAdvance = stack.autoAdvance.videoAdvance
     stackSettingsForm.repeat = stack.autoAdvance.repeat
     stackSettingsForm.transition = stack.autoAdvance.transition || 'fade'
   }
@@ -813,8 +1006,8 @@ function saveStackSettings() {
   if (currentStackForSettings.value !== null) {
     updateStackSettings(currentStackForSettings.value, {
       enabled: stackSettingsForm.enabled,
-      type: stackSettingsForm.type,
       delay: stackSettingsForm.delay,
+      videoAdvance: stackSettingsForm.videoAdvance,
       repeat: stackSettingsForm.repeat,
       transition: stackSettingsForm.transition
     })
@@ -1006,11 +1199,114 @@ async function openProjectorOnMonitor() {
   await openProjector(selectedMonitor.value)
 }
 
-async function newPresentation() {
-  if (confirm('Create a new presentation? This will clear all current stacks.')) {
-    stacks.value = []
-    addStack('Welcome')
+// Library management functions
+async function handleCreateLibrary({ name, path }) {
+  const result = await createLibrary(path, name)
+  if (result.success) {
+    showNewLibraryDialog.value = false
+    alert(`Library "${name}" created successfully!`)
+  } else {
+    alert(`Failed to create library: ${result.error}`)
   }
+}
+
+async function handleOpenLibrary(libPath, metadata) {
+  // Library is already opened in the dialog
+  console.log('Library opened:', metadata.name)
+}
+
+async function handleOpenEvent(eventName) {
+  const result = await loadEvent(eventName)
+  if (result.success) {
+    // Clear projection before loading new event
+    clearProjection()
+    loadPresentationData(JSON.stringify(result.data))
+    console.log('Event loaded:', eventName)
+  } else {
+    alert(`Failed to load event: ${result.error}`)
+  }
+}
+
+async function handleCreateNewEvent(eventData) {
+  console.log('Creating new event:', eventData)
+
+  // Create the new event
+  const createResult = await createEvent(eventData.name)
+  if (!createResult.success) {
+    alert(`Failed to create event: ${createResult.error}`)
+    return
+  }
+
+  // Clear projection
+  clearProjection()
+
+  // If copying from an existing event, load its data
+  if (eventData.copyFrom) {
+    console.log('Copying from event:', eventData.copyFrom)
+    const loadResult = await loadEvent(eventData.copyFrom)
+    if (loadResult.success) {
+      loadPresentationData(JSON.stringify(loadResult.data))
+
+      // Save immediately with the new name
+      const data = {
+        title: eventData.name,
+        stacks: toRaw(stacks.value)
+      }
+      await saveEvent(data)
+      console.log('Event copied successfully')
+    } else {
+      // If load fails, just start with empty stacks
+      stacks.value = []
+      console.warn('Failed to copy event, starting blank')
+    }
+  } else {
+    // Start with empty stacks
+    stacks.value = []
+    console.log('Event created (blank)')
+  }
+}
+
+async function handleDeleteEvent(eventName) {
+  console.log('Deleting event:', eventName)
+  const result = await deleteEvent(eventName)
+
+  if (result.success) {
+    console.log('Event deleted successfully')
+    // If we deleted the currently open event, clear stacks
+    if (currentEventName.value === eventName) {
+      stacks.value = []
+      clearProjection()
+    }
+  } else {
+    alert(`Failed to delete event: ${result.error}`)
+  }
+}
+
+function handleCloseLibrary() {
+  // Clear all stacks and projections
+  stacks.value = []
+  clearProjection()
+  // Close the library
+  closeLibrary()
+  console.log('Library closed, stacks cleared')
+}
+
+function handleNewEventFromDialog() {
+  showOpenLibraryDialog.value = false
+  showNewEventDialog.value = true
+}
+
+async function newPresentation() {
+  if (!isLibraryOpen.value) {
+    // No library open, prompt to create/open library first
+    if (confirm('You need to open a library first. Open library?')) {
+      showOpenLibraryDialog.value = true
+    }
+    return
+  }
+
+  // Library is open, show new event dialog
+  showNewEventDialog.value = true
 }
 
 async function savePresentation() {
@@ -1020,13 +1316,23 @@ async function savePresentation() {
       return
     }
 
-    const data = savePresentationData()
-    const result = await window.electronAPI.savePresentation(data)
-
-    if (result.success) {
-      alert('Presentation saved successfully!')
-    } else if (!result.canceled) {
-      alert('Failed to save presentation: ' + (result.error || 'Unknown error'))
+    // If library is open, save to library event
+    if (isLibraryOpen.value && currentEventName.value) {
+      const data = {
+        title: currentEventName.value,
+        stacks: toRaw(stacks.value)
+      }
+      const result = await saveEvent(data)
+      if (result.success) {
+        console.log('Event saved to library')
+      } else {
+        alert('Failed to save event: ' + (result.error || 'Unknown error'))
+      }
+    } else {
+      // Fallback to old save method (prompt to create library first)
+      if (confirm('No library open. Would you like to create a library first?')) {
+        showNewLibraryDialog.value = true
+      }
     }
   } catch (error) {
     console.error('Failed to save presentation:', error)
@@ -1035,24 +1341,8 @@ async function savePresentation() {
 }
 
 async function loadPresentation() {
-  try {
-    if (!window.electronAPI) {
-      alert('File operations not available')
-      return
-    }
-
-    const result = await window.electronAPI.loadPresentation()
-
-    if (result.success) {
-      loadPresentationData(result.data)
-      alert('Presentation loaded successfully!')
-    } else if (!result.canceled) {
-      alert('Failed to load presentation: ' + (result.error || 'Unknown error'))
-    }
-  } catch (error) {
-    console.error('Failed to load presentation:', error)
-    alert('Failed to load presentation: ' + error.message)
-  }
+  // Open library dialog instead of old file picker
+  showOpenLibraryDialog.value = true
 }
 
 useKeyboard({
@@ -1081,8 +1371,94 @@ function closeWindow() {
   }
 }
 
+// Auto-save functionality
+let autoSaveTimer = null
+
+function getTimeSince(date) {
+  const seconds = Math.floor((Date.now() - date) / 1000)
+  if (seconds < 5) return 'just now'
+  if (seconds < 60) return `${seconds}s ago`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  return `${hours}h ago`
+}
+
+async function performAutoSave() {
+  if (!isLibraryOpen.value || !currentEventName.value) return
+
+  saveStatus.value = 'saving'
+
+  const data = {
+    title: currentEventName.value,
+    stacks: toRaw(stacks.value)
+  }
+
+  const result = await saveEvent(data)
+
+  if (result.success) {
+    const savedAt = Date.now()
+    saveStatus.value = 'saved'
+    lastSaveTime.value = 'just now'
+
+    // Update "time ago" every 10 seconds
+    const updateInterval = setInterval(() => {
+      if (saveStatus.value !== 'saved') {
+        clearInterval(updateInterval)
+        return
+      }
+      lastSaveTime.value = getTimeSince(savedAt)
+    }, 10000)
+  } else {
+    saveStatus.value = ''
+    console.error('Auto-save failed:', result.error)
+  }
+}
+
+function scheduleAutoSave() {
+  if (autoSaveTimer) {
+    clearTimeout(autoSaveTimer)
+  }
+
+  // Debounce: save 2 seconds after last change
+  autoSaveTimer = setTimeout(() => {
+    performAutoSave()
+  }, 2000)
+}
+
+// Watch stacks for changes and trigger auto-save
+watch(
+  () => stacks.value,
+  () => {
+    if (isLibraryOpen.value && currentEventName.value) {
+      scheduleAutoSave()
+    }
+  },
+  { deep: true }
+)
+
+// Sync libraryRoot with usePresentation for asset resolution
+watch(
+  () => libraryRoot.value,
+  (newLibraryRoot) => {
+    setLibraryRoot(newLibraryRoot)
+  },
+  { immediate: true }
+)
+
 // Listen for video completion events from projector window
-onMounted(() => {
+onMounted(async () => {
+  // Auto-open last library if one exists
+  const lastLibraryPath = getLastLibraryPath()
+  if (lastLibraryPath) {
+    console.log('Auto-opening last library:', lastLibraryPath)
+    const result = await openLibrary(lastLibraryPath)
+    if (!result.success) {
+      console.warn('Failed to auto-open last library:', result.error)
+      // Don't show error to user - they can manually open/create a library
+    }
+  }
+
   if (window.electronAPI && window.electronAPI.onVideoEnded) {
     console.log('ControlView: Setting up video-ended listener')
     window.electronAPI.onVideoEnded(() => {
