@@ -450,6 +450,18 @@
       </div>
     </Modal>
 
+    <!-- Input Dialog for New Stack -->
+    <InputDialog
+      :show="showInputDialog"
+      title="New Stack"
+      message="Enter a title for the new stack:"
+      placeholder="New Stack"
+      defaultValue="New Stack"
+      @confirm="handleNewStackConfirm"
+      @cancel="handleNewStackCancel"
+      @close="handleNewStackCancel"
+    />
+
     <!-- Monitor Selection Dialog -->
     <Modal :show="showMonitorDialog" title="Select Projector Display" @close="showMonitorDialog = false">
       <div class="space-y-4">
@@ -506,6 +518,7 @@ import AddBibleSlide from '../components/AddBibleSlide.vue'
 import AddYouTubeSlide from '../components/AddYouTubeSlide.vue'
 import AddImageSlide from '../components/AddImageSlide.vue'
 import AddLocalVideoSlide from '../components/AddLocalVideoSlide.vue'
+import InputDialog from '../components/InputDialog.vue'
 
 const {
   stacks,
@@ -551,6 +564,7 @@ const showVideoDialog = ref(false)
 const showMonitorDialog = ref(false)
 const showAddSlideMenu = ref(false)
 const showStackSettings = ref(false)
+const showInputDialog = ref(false)
 const availableMonitors = ref([])
 const selectedMonitor = ref(0)
 const currentStackForAdd = ref(null)
@@ -592,12 +606,20 @@ function toggleStack(stackIndex) {
 
 function addNewStack() {
   console.log('addNewStack called!')
-  const title = prompt('Enter stack title:', 'New Stack')
-  console.log('Prompt returned:', title)
+  showInputDialog.value = true
+}
+
+function handleNewStackConfirm(title) {
+  console.log('Stack title entered:', title)
   if (title) {
     addStack(title)
     console.log('Stack added')
   }
+  showInputDialog.value = false
+}
+
+function handleNewStackCancel() {
+  showInputDialog.value = false
 }
 
 function openAddSlideMenu(stackIndex) {

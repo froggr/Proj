@@ -6,24 +6,39 @@ const fs = require('fs')
 console.log('Forcing X11/XWayland for Wayland compatibility')
 app.commandLine.appendSwitch('--ozone-platform=x11')
 
-// Keep --no-sandbox for Wayland/Cosmic compatibility, but re-enable GPU for performance
+// Disable sandbox for Wayland/Cosmic compatibility
 app.commandLine.appendSwitch('--no-sandbox')
+app.commandLine.appendSwitch('--disable-setuid-sandbox')
+
 console.log('Using X11 mode with hardware acceleration enabled')
 
 // Keep references to windows to prevent garbage collection
 let mainWindow = null
 let projectorWindow = null
 
-const isDev = process.env.NODE_ENV !== 'production'
+// Determine if we're in development mode
+const isDev = !app.isPackaged
+console.log('=================================')
+console.log('app.isPackaged:', app.isPackaged)
+console.log('Development mode:', isDev)
+console.log('process.env.NODE_ENV:', process.env.NODE_ENV)
+console.log('process.argv:', process.argv)
+console.log('=================================')
+
+// Disable web security in dev mode to allow DevTools (ONLY in dev)
+if (isDev) {
+  app.commandLine.appendSwitch('--disable-features=OutOfBlinkCors')
+}
 
 function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     webPreferences: {
+      devTools: true,
+      preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
-      contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
+      contextIsolation: true
     },
     title: 'DongleControl Projector'
   })
@@ -52,6 +67,8 @@ function createMainWindow() {
     const vitePort = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173'
     console.log('Loading main window from:', vitePort)
     mainWindow.loadURL(vitePort)
+    // Auto-open DevTools in development
+    mainWindow.webContents.openDevTools()
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
   }
@@ -59,6 +76,29 @@ function createMainWindow() {
   // Log when page finishes loading
   mainWindow.webContents.on('did-finish-load', () => {
     console.log('Main window finished loading')
+    if (isDev) {
+      console.log('Attempting to open DevTools...')
+
+      // Try opening DevTools multiple times with different approaches
+      setTimeout(() => {
+        console.log('Trying to open DevTools (attempt 1)...')
+        mainWindow.webContents.openDevTools()
+      }, 100)
+
+      setTimeout(() => {
+        if (!mainWindow.webContents.isDevToolsOpened()) {
+          console.log('Trying to open DevTools (attempt 2 - detached)...')
+          mainWindow.webContents.openDevTools({ mode: 'detach' })
+        }
+      }, 500)
+
+      setTimeout(() => {
+        if (!mainWindow.webContents.isDevToolsOpened()) {
+          console.log('Trying to open DevTools (attempt 3 - undocked)...')
+          mainWindow.webContents.openDevTools({ mode: 'undocked' })
+        }
+      }, 1000)
+    }
   })
 
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {

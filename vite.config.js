@@ -10,6 +10,20 @@ export default defineConfig({
       {
         // Main process entry point
         entry: 'electron/main.js',
+        vite: {
+          build: {
+            rollupOptions: {
+              external: ['electron']
+            }
+          }
+        },
+        // Disable auto-start when using dev:separate
+        onstart({ startup }) {
+          // Only auto-start if not using separate mode
+          if (process.env.ELECTRON_SEPARATE !== 'true') {
+            startup(['.', '--no-sandbox', '--disable-setuid-sandbox'])
+          }
+        }
       },
       {
         // Preload script
@@ -20,7 +34,10 @@ export default defineConfig({
         },
       },
     ]),
-    renderer(),
+    renderer({
+      // Allow Node.js APIs in renderer
+      nodeIntegration: false
+    }),
   ],
   server: {
     port: 5173, // Standard Vite port
