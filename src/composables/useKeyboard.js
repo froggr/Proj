@@ -9,6 +9,20 @@ export function useKeyboard(callbacks) {
   } = callbacks
 
   function handleKeydown(event) {
+    // Check if user is typing in an input field
+    const activeElement = document.activeElement
+    const isTyping = activeElement && (
+      activeElement.tagName === 'INPUT' ||
+      activeElement.tagName === 'TEXTAREA' ||
+      activeElement.tagName === 'SELECT' ||
+      activeElement.isContentEditable
+    )
+
+    // Don't intercept keyboard shortcuts when typing in inputs
+    if (isTyping && (event.code === 'Space' || event.code === 'ArrowLeft' || event.code === 'ArrowRight')) {
+      return // Let the input handle it naturally
+    }
+
     switch (event.code) {
       case 'Space':
         event.preventDefault()

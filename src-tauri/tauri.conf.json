@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Church Presenter",
+  "productName": "DongleControl Projector",
   "version": "0.1.0",
-  "identifier": "com.churchpresenter.app",
+  "identifier": "com.donglecontrol.projector",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -18,7 +18,7 @@
       {
         "fullscreen": false,
         "resizable": true,
-        "title": "Church Presenter - Control",
+        "title": "DongleControl Projector",
         "width": 1400,
         "height": 900,
         "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"

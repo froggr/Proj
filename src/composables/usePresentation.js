@@ -1,32 +1,79 @@
 import { ref, computed, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 
-const slides = ref([
+// Stacks structure:
+// [
+//   {
+//     id: '1',
+//     title: 'Welcome',
+//     autoAdvance: { enabled: false, type: 'manual', delay: 5000, repeat: false },
+//     slides: [
+//       { type: 'image', imageUrl: '...', title: 'Welcome 1' },
+//       { type: 'custom', html: '...', background: '#000', title: 'Welcome 2' }
+//     ]
+//   }
+// ]
+
+const stacks = ref([
   {
-    type: 'image',
-    imageUrl: 'https://via.placeholder.com/1920x1080/1a1a1a/ffffff?text=Welcome+to+Church',
-    title: 'Welcome'
+    id: '1',
+    title: 'Welcome',
+    autoAdvance: { enabled: false, type: 'manual', delay: 5000, repeat: false },
+    slides: [
+      {
+        type: 'image',
+        imageUrl: 'https://via.placeholder.com/1920x1080/1a1a1a/ffffff?text=Welcome+to+Church',
+        title: 'Welcome'
+      }
+    ]
   },
   {
-    type: 'bible',
-    reference: 'John 3:16-17',
-    text: 'For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life. For God did not send his Son into the world to condemn the world, but to save the world through him.',
-    translation: 'NIV',
-    linesPerSlide: 3,
-    font: 'Inter',
-    background: '#1a1a1a'
-  },
-  {
-    type: 'image',
-    imageUrl: 'https://via.placeholder.com/1920x1080/1a1a1a/ffffff?text=Announcements',
-    title: 'Announcements'
+    id: '2',
+    title: 'Scripture',
+    autoAdvance: { enabled: false, type: 'manual', delay: 5000, repeat: false },
+    slides: [
+      {
+        type: 'bible',
+        reference: 'John 3:16-17',
+        text: 'For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life. For God did not send his Son into the world to condemn the world, but to save the world through him.',
+        translation: 'NIV',
+        linesPerSlide: 3,
+        font: 'Inter',
+        background: '#1a1a1a'
+      }
+    ]
   }
 ])
 
-const stagedIndex = ref(0)
-const liveIndex = ref(null)
+// Current staged stack and slide
+const stagedStackIndex = ref(0)
+const stagedSlideIndex = ref(0)
+
+// Current live stack and slide
+const liveStackIndex = ref(null)
+const liveSlideIndex = ref(null)
 
 let watchInitialized = false
+let debounceTimer = null
+let autoAdvanceTimer = null
+
+// Debounced function to update projector
+function updateProjector(liveSlide) {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer)
+  }
+
+  debounceTimer = setTimeout(async () => {
+    try {
+      const slideJson = JSON.stringify(liveSlide)
+      console.log('Control: Sending slide to projector:', slideJson)
+      await invoke('update_projector', { slideData: slideJson })
+      console.log('Control: Successfully sent to projector')
+    } catch (error) {
+      console.error('Control: Failed to update projector:', error)
+    }
+  }, 50)
+}
 
 export function usePresentation() {
   // Initialize watch only once
@@ -34,73 +81,234 @@ export function usePresentation() {
     watchInitialized = true
 
     // Watch for live slide changes and send to projector window
-    watch(liveIndex, async (newLiveIndex) => {
-      const liveSlide = newLiveIndex !== null ? slides.value[newLiveIndex] : null
-      console.log('Control: Live index changed to:', newLiveIndex, 'Slide:', liveSlide)
-      try {
-        const slideJson = JSON.stringify(liveSlide)
-        console.log('Control: Sending to projector:', slideJson)
-        await invoke('update_projector', { slideData: slideJson })
-        console.log('Control: Successfully sent to projector')
-      } catch (error) {
-        console.error('Control: Failed to update projector:', error)
+    watch([liveStackIndex, liveSlideIndex], ([newStackIndex, newSlideIndex]) => {
+      const liveSlide = newStackIndex !== null && newSlideIndex !== null
+        ? stacks.value[newStackIndex]?.slides[newSlideIndex]
+        : null
+
+      updateProjector(liveSlide)
+
+      // Handle auto-advance if enabled
+      if (liveSlide && newStackIndex !== null) {
+        handleAutoAdvance(newStackIndex, newSlideIndex)
       }
-    })
+    }, { flush: 'post' })
   }
-  const stagedSlide = computed(() => slides.value[stagedIndex.value])
+
+  // Computed values
+  const currentStack = computed(() => stacks.value[stagedStackIndex.value])
+  const currentSlide = computed(() => currentStack.value?.slides[stagedSlideIndex.value])
+
+  const liveStack = computed(() =>
+    liveStackIndex.value !== null ? stacks.value[liveStackIndex.value] : null
+  )
   const liveSlide = computed(() =>
-    liveIndex.value !== null ? slides.value[liveIndex.value] : null
+    liveStackIndex.value !== null && liveSlideIndex.value !== null
+      ? stacks.value[liveStackIndex.value]?.slides[liveSlideIndex.value]
+      : null
   )
 
-  const canGoPrev = computed(() => stagedIndex.value > 0)
-  const canGoNext = computed(() => stagedIndex.value < slides.value.length - 1)
+  // Navigation constraints
+  const canGoPrevSlide = computed(() => stagedSlideIndex.value > 0)
+  const canGoNextSlide = computed(() =>
+    currentStack.value && stagedSlideIndex.value < currentStack.value.slides.length - 1
+  )
+  const canGoPrevStack = computed(() => stagedStackIndex.value > 0)
+  const canGoNextStack = computed(() => stagedStackIndex.value < stacks.value.length - 1)
 
-  function goLive() {
-    liveIndex.value = stagedIndex.value
+  // Auto-advance logic
+  function handleAutoAdvance(stackIndex, slideIndex) {
+    // Clear existing timer
+    if (autoAdvanceTimer) {
+      clearTimeout(autoAdvanceTimer)
+      autoAdvanceTimer = null
+    }
+
+    const stack = stacks.value[stackIndex]
+    if (!stack || !stack.autoAdvance.enabled) return
+
+    const { type, delay, repeat } = stack.autoAdvance
+    const currentSlide = stack.slides[slideIndex]
+
+    if (type === 'timer') {
+      autoAdvanceTimer = setTimeout(() => {
+        goNextSlideInLiveStack(repeat)
+      }, delay)
+    } else if (type === 'video-end') {
+      // Video-end auto-advance is handled by onVideoComplete callback
+      // No timer needed - will advance when video emits ended event
+    } else if (type === 'youtube-end') {
+      // YouTube-end auto-advance is handled by onYouTubeComplete callback
+      // No timer needed - will advance when YouTube video ends
+    }
   }
 
+  // Called when a video completes playing
+  function onVideoComplete() {
+    if (liveStackIndex.value === null) return
+
+    const stack = stacks.value[liveStackIndex.value]
+    if (!stack || !stack.autoAdvance.enabled) return
+
+    const { type, repeat } = stack.autoAdvance
+    if (type === 'video-end' || type === 'youtube-end') {
+      goNextSlideInLiveStack(repeat)
+    }
+  }
+
+  // Go to next slide in the live stack
+  function goNextSlideInLiveStack(repeat = false) {
+    if (liveStackIndex.value === null || liveSlideIndex.value === null) return
+
+    const stack = stacks.value[liveStackIndex.value]
+    if (!stack) return
+
+    if (liveSlideIndex.value < stack.slides.length - 1) {
+      // Go to next slide in stack
+      liveSlideIndex.value++
+      // Also advance staged to match
+      stagedStackIndex.value = liveStackIndex.value
+      stagedSlideIndex.value = liveSlideIndex.value
+    } else if (repeat) {
+      // Loop back to first slide in stack
+      liveSlideIndex.value = 0
+      stagedSlideIndex.value = 0
+    } else {
+      // End of stack, stop auto-advance
+      if (autoAdvanceTimer) {
+        clearTimeout(autoAdvanceTimer)
+        autoAdvanceTimer = null
+      }
+    }
+  }
+
+  // Core actions
+  function goLive() {
+    liveStackIndex.value = stagedStackIndex.value
+    liveSlideIndex.value = stagedSlideIndex.value
+  }
+
+  function clearProjection() {
+    if (autoAdvanceTimer) {
+      clearTimeout(autoAdvanceTimer)
+      autoAdvanceTimer = null
+    }
+    liveStackIndex.value = null
+    liveSlideIndex.value = null
+  }
+
+  // Slide navigation (within current stack)
   function nextSlide() {
-    if (canGoNext.value) {
-      stagedIndex.value++
+    if (canGoNextSlide.value) {
+      stagedSlideIndex.value++
     }
   }
 
   function prevSlide() {
-    if (canGoPrev.value) {
-      stagedIndex.value--
+    if (canGoPrevSlide.value) {
+      stagedSlideIndex.value--
     }
   }
 
-  function clearProjection() {
-    liveIndex.value = null
-  }
-
-  function stageSlide(index) {
-    if (index >= 0 && index < slides.value.length) {
-      stagedIndex.value = index
+  // Stack navigation
+  function nextStack() {
+    if (canGoNextStack.value) {
+      stagedStackIndex.value++
+      stagedSlideIndex.value = 0 // Reset to first slide in new stack
     }
   }
 
-  function addSlide(slide) {
-    slides.value.push(slide)
+  function prevStack() {
+    if (canGoPrevStack.value) {
+      stagedStackIndex.value--
+      stagedSlideIndex.value = 0 // Reset to first slide in new stack
+    }
   }
 
-  function removeSlide(index) {
-    if (slides.value.length > 1) {
-      slides.value.splice(index, 1)
-      if (stagedIndex.value >= slides.value.length) {
-        stagedIndex.value = slides.value.length - 1
+  // Direct navigation
+  function stageStack(stackIndex) {
+    if (stackIndex >= 0 && stackIndex < stacks.value.length) {
+      stagedStackIndex.value = stackIndex
+      stagedSlideIndex.value = 0
+    }
+  }
+
+  function stageSlideInStack(stackIndex, slideIndex) {
+    if (stackIndex >= 0 && stackIndex < stacks.value.length) {
+      const stack = stacks.value[stackIndex]
+      if (slideIndex >= 0 && slideIndex < stack.slides.length) {
+        stagedStackIndex.value = stackIndex
+        stagedSlideIndex.value = slideIndex
       }
-      if (liveIndex.value !== null && liveIndex.value >= slides.value.length) {
-        liveIndex.value = null
+    }
+  }
+
+  // Stack management
+  function addStack(title = 'New Stack') {
+    const newStack = {
+      id: Date.now().toString(),
+      title,
+      autoAdvance: { enabled: false, type: 'manual', delay: 5000, repeat: false },
+      slides: []
+    }
+    stacks.value.push(newStack)
+    return newStack.id
+  }
+
+  function removeStack(stackIndex) {
+    if (stacks.value.length > 1 && stackIndex >= 0 && stackIndex < stacks.value.length) {
+      stacks.value.splice(stackIndex, 1)
+
+      // Adjust staged index if needed
+      if (stagedStackIndex.value >= stacks.value.length) {
+        stagedStackIndex.value = stacks.value.length - 1
+        stagedSlideIndex.value = 0
+      }
+
+      // Clear live if it was the removed stack
+      if (liveStackIndex.value === stackIndex) {
+        clearProjection()
+      } else if (liveStackIndex.value !== null && liveStackIndex.value > stackIndex) {
+        liveStackIndex.value--
       }
     }
   }
 
+  function updateStackSettings(stackIndex, autoAdvanceSettings) {
+    if (stackIndex >= 0 && stackIndex < stacks.value.length) {
+      stacks.value[stackIndex].autoAdvance = { ...autoAdvanceSettings }
+    }
+  }
+
+  // Slide management
+  function addSlideToStack(stackIndex, slide) {
+    if (stackIndex >= 0 && stackIndex < stacks.value.length) {
+      stacks.value[stackIndex].slides.push(slide)
+    }
+  }
+
+  function removeSlideFromStack(stackIndex, slideIndex) {
+    const stack = stacks.value[stackIndex]
+    if (stack && stack.slides.length > 1 && slideIndex >= 0 && slideIndex < stack.slides.length) {
+      stack.slides.splice(slideIndex, 1)
+
+      // Adjust staged index if needed
+      if (stagedStackIndex.value === stackIndex && stagedSlideIndex.value >= stack.slides.length) {
+        stagedSlideIndex.value = stack.slides.length - 1
+      }
+
+      // Clear live if it was the removed slide
+      if (liveStackIndex.value === stackIndex && liveSlideIndex.value === slideIndex) {
+        clearProjection()
+      }
+    }
+  }
+
+  // Persistence
   function savePresentation() {
     const presentation = {
       title: 'Sunday Service',
-      slides: slides.value
+      stacks: stacks.value
     }
     return JSON.stringify(presentation, null, 2)
   }
@@ -108,10 +316,11 @@ export function usePresentation() {
   function loadPresentation(jsonData) {
     try {
       const presentation = JSON.parse(jsonData)
-      if (presentation.slides && Array.isArray(presentation.slides)) {
-        slides.value = presentation.slides
-        stagedIndex.value = 0
-        liveIndex.value = null
+      if (presentation.stacks && Array.isArray(presentation.stacks)) {
+        stacks.value = presentation.stacks
+        stagedStackIndex.value = 0
+        stagedSlideIndex.value = 0
+        clearProjection()
       }
     } catch (error) {
       console.error('Failed to load presentation:', error)
@@ -119,22 +328,50 @@ export function usePresentation() {
   }
 
   return {
-    slides,
-    stagedSlide,
+    // State
+    stacks,
+    currentStack,
+    currentSlide,
+    liveStack,
     liveSlide,
-    stagedIndex,
-    liveIndex,
-    canGoPrev,
-    canGoNext,
+    stagedStackIndex,
+    stagedSlideIndex,
+    liveStackIndex,
+    liveSlideIndex,
+
+    // Navigation constraints
+    canGoPrevSlide,
+    canGoNextSlide,
+    canGoPrevStack,
+    canGoNextStack,
+
+    // Actions
     goLive,
+    clearProjection,
     nextSlide,
     prevSlide,
-    clearProjection,
-    stageSlide,
-    addSlide,
-    removeSlide,
+    nextStack,
+    prevStack,
+    stageStack,
+    stageSlideInStack,
+
+    // Stack management
+    addStack,
+    removeStack,
+    updateStackSettings,
+
+    // Slide management
+    addSlideToStack,
+    removeSlideFromStack,
+
+    // Auto-advance
+    onVideoComplete,
+
+    // Persistence
     savePresentation,
     loadPresentation,
+
+    // Utility
     watchActive: () => watchInitialized
   }
 }

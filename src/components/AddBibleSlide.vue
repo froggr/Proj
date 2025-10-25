@@ -106,17 +106,44 @@ const linesPerSlide = ref(3)
 const background = ref('#1a1a1a')
 
 function addSlide() {
-  const slide = {
-    type: 'bible',
-    reference: reference.value,
-    text: text.value,
-    translation: translation.value,
-    linesPerSlide: linesPerSlide.value,
-    font: 'Inter',
-    background: background.value
+  // Split text into verses (by numbers at start of line or by periods)
+  const verses = text.value
+    .split(/(?=\d+)/) // Split before verse numbers
+    .map(v => v.trim())
+    .filter(v => v.length > 0)
+
+  // Group verses by linesPerSlide
+  const slides = []
+  for (let i = 0; i < verses.length; i += linesPerSlide.value) {
+    const chunk = verses.slice(i, i + linesPerSlide.value)
+    const slideText = chunk.join(' ')
+
+    slides.push({
+      type: 'bible',
+      reference: reference.value,
+      text: slideText,
+      translation: translation.value,
+      linesPerSlide: linesPerSlide.value,
+      font: 'Inter',
+      background: background.value,
+      title: `${reference.value} (${i / linesPerSlide.value + 1})`
+    })
   }
 
-  emit('add', slide)
+  // Emit all slides (or single slide if no splitting needed)
+  if (slides.length > 1) {
+    slides.forEach(slide => emit('add', slide))
+  } else {
+    emit('add', slides[0] || {
+      type: 'bible',
+      reference: reference.value,
+      text: text.value,
+      translation: translation.value,
+      linesPerSlide: linesPerSlide.value,
+      font: 'Inter',
+      background: background.value
+    })
+  }
 
   // Reset
   reference.value = ''
