@@ -6,15 +6,9 @@ const fs = require('fs')
 console.log('Forcing X11/XWayland for Wayland compatibility')
 app.commandLine.appendSwitch('--ozone-platform=x11')
 
-// Disable GPU acceleration to fix Linux rendering issues
-console.log('Disabling GPU acceleration for Linux compatibility')
-app.disableHardwareAcceleration()
+// Keep --no-sandbox for Wayland/Cosmic compatibility, but re-enable GPU for performance
 app.commandLine.appendSwitch('--no-sandbox')
-app.commandLine.appendSwitch('--disable-gpu')
-app.commandLine.appendSwitch('--disable-software-rasterizer')
-app.commandLine.appendSwitch('--disable-gpu-compositing')
-app.commandLine.appendSwitch('--disable-dev-shm-usage')
-console.log('GPU switches applied')
+console.log('Using X11 mode with hardware acceleration enabled')
 
 // Keep references to windows to prevent garbage collection
 let mainWindow = null

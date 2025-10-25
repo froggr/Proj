@@ -4,14 +4,8 @@ const path = require("path");
 const fs = require("fs");
 console.log("Forcing X11/XWayland for Wayland compatibility");
 app.commandLine.appendSwitch("--ozone-platform=x11");
-console.log("Disabling GPU acceleration for Linux compatibility");
-app.disableHardwareAcceleration();
 app.commandLine.appendSwitch("--no-sandbox");
-app.commandLine.appendSwitch("--disable-gpu");
-app.commandLine.appendSwitch("--disable-software-rasterizer");
-app.commandLine.appendSwitch("--disable-gpu-compositing");
-app.commandLine.appendSwitch("--disable-dev-shm-usage");
-console.log("GPU switches applied");
+console.log("Using X11 mode with hardware acceleration enabled");
 let mainWindow = null;
 let projectorWindow = null;
 const isDev = process.env.NODE_ENV !== "production";
@@ -141,6 +135,12 @@ ipcMain.handle("update-projector", (event, slideData) => {
   } else {
     console.log("Main: Projector window not available");
     return { success: false, error: "Projector window not open" };
+  }
+});
+ipcMain.on("video-ended", () => {
+  console.log("Main: Video ended notification from projector, forwarding to control window");
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("video-ended-notification");
   }
 });
 ipcMain.handle("save-presentation", async (event, data) => {

@@ -168,13 +168,24 @@ watch(() => props.slide, (newSlide, oldSlide) => {
 onMounted(() => {
   if (typeof window !== 'undefined') {
     window.addEventListener('message', (event) => {
+      // Debug: Log ALL messages from YouTube origin
+      if (event.origin === 'https://www.youtube.com') {
+        console.log('SlidePreview: Received YouTube message:', event.data)
+      }
+
       if (event.data && typeof event.data === 'string') {
         try {
           const data = JSON.parse(event.data)
 
+          // Debug parsed data from YouTube
+          if (data.event) {
+            console.log('SlidePreview: Parsed YouTube event:', data)
+          }
+
           // When video starts playing on projector, unmute it
           if (data.event === 'onStateChange' && data.info === 1 && props.isProjector) {
             // State 1 = playing, unmute immediately
+            console.log('SlidePreview: Video started playing (state 1), unmuting')
             if (youtubeIframeRef.value) {
               youtubeIframeRef.value.contentWindow.postMessage(
                 '{"event":"command","func":"unMute","args":""}',
@@ -185,6 +196,7 @@ onMounted(() => {
 
           // YouTube video ended (state 0 = ended)
           if (data.event === 'onStateChange' && data.info === 0) {
+            console.log('SlidePreview: YouTube video ended (state 0), emitting youtube-ended event')
             emit('youtube-ended')
           }
         } catch (e) {

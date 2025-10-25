@@ -782,12 +782,14 @@ useKeyboard({
 
 // Listen for video completion events from projector window
 onMounted(() => {
-  if (window.electronAPI) {
+  if (window.electronAPI && window.electronAPI.onVideoEnded) {
     console.log('ControlView: Setting up video-ended listener')
     window.electronAPI.onVideoEnded(() => {
       console.log('ControlView: Received video-ended notification from projector')
       onVideoComplete()
     })
+  } else {
+    console.log('ControlView: onVideoEnded not available (preload script may need rebuild)')
   }
 })
 </script>
