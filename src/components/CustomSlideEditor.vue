@@ -3,7 +3,7 @@
     <div class="bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl w-full max-w-7xl h-[90vh] flex flex-col">
       <!-- Header -->
       <div class="flex items-center justify-between px-6 py-4 border-b border-neutral-800">
-        <h2 class="text-xl font-semibold text-gold-500">Create Custom Slide</h2>
+        <h2 class="text-xl font-semibold text-gold-500">{{ initialSlide ? 'Edit Custom Slide' : 'Create Custom Slide' }}</h2>
         <button
           @click="closeModal"
           class="text-neutral-400 hover:text-white transition-colors"
@@ -40,13 +40,13 @@
               <!-- Font Size -->
               <select
                 v-model="fontSize"
-                @change="applyStyle"
+                @change="applyFontSize"
                 class="px-2 py-1 bg-neutral-900 border border-neutral-700 rounded text-white text-xs"
               >
-                <option value="1">Small</option>
-                <option value="3">Normal</option>
-                <option value="5">Large</option>
-                <option value="7">Huge</option>
+                <option value="0.7em">Small</option>
+                <option value="1em">Normal</option>
+                <option value="1.5em">Large</option>
+                <option value="2.5em">Huge</option>
               </select>
 
               <div class="w-px h-4 bg-neutral-700"></div>
@@ -123,8 +123,8 @@
               ref="editorRef"
               contenteditable="true"
               @input="updateContent"
-              class="w-full min-h-[200px] px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-lg text-white text-base focus:outline-none focus:ring-2 focus:ring-gold-500/50 overflow-auto"
-              style="max-height: 300px;"
+              class="w-full min-h-[200px] px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-gold-500/50 overflow-auto custom-editor"
+              style="max-height: 300px; white-space: pre-wrap; text-align: center; font-size: 20px; line-height: 1.5;"
             ></div>
           </div>
 
@@ -163,8 +163,14 @@
             >
               <div
                 class="w-full h-full p-8 overflow-hidden flex items-center justify-center"
-                v-html="contentHtml"
-              ></div>
+                style="font-size: 28px;"
+              >
+                <div
+                  class="w-full custom-preview"
+                  style="text-align: center; white-space: pre-wrap; line-height: 1.6;"
+                  v-html="contentHtml"
+                ></div>
+              </div>
             </div>
             <!-- Gold border to show it's a preview -->
             <div class="absolute inset-0 border-2 border-gold-500/30 rounded-lg pointer-events-none"></div>
@@ -188,7 +194,7 @@
           @click="addSlide"
           class="px-6 py-2 bg-gold-500 hover:bg-gold-400 text-black font-bold rounded-lg transition-colors text-sm shadow-lg shadow-gold-500/20"
         >
-          Add Slide
+          {{ initialSlide ? 'Update Slide' : 'Add Slide' }}
         </button>
       </div>
     </div>
@@ -196,12 +202,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 
 const props = defineProps({
   show: {
     type: Boolean,
     default: false
+  },
+  initialSlide: {
+    type: Object,
+    default: null
   }
 })
 
@@ -209,10 +219,32 @@ const emit = defineEmits(['close', 'add'])
 
 const editorRef = ref(null)
 const slideTitle = ref('')
-const contentHtml = ref('<p style="text-align: center; font-size: 32px; color: white;">Type your content here...</p>')
+const contentHtml = ref('Type your content here...')
 const backgroundColor = ref('#1a1a1a')
-const fontSize = ref('3')
+const fontSize = ref('1em')
 const textColor = ref('#ffffff')
+
+// Watch for initialSlide changes to populate form when editing
+watch(() => props.initialSlide, (slide) => {
+  if (slide && slide.type === 'custom') {
+    slideTitle.value = slide.title || ''
+    contentHtml.value = slide.html || ''
+    backgroundColor.value = slide.background || '#1a1a1a'
+    // Need to wait for next tick to ensure editorRef is available
+    setTimeout(() => {
+      if (editorRef.value) {
+        editorRef.value.innerHTML = contentHtml.value
+      }
+    }, 100)
+  }
+}, { immediate: true })
+
+// Also watch for show prop to reload editor when dialog opens
+watch(() => props.show, (isShown) => {
+  if (isShown && editorRef.value && contentHtml.value) {
+    editorRef.value.innerHTML = contentHtml.value
+  }
+})
 
 onMounted(() => {
   if (editorRef.value) {
@@ -225,8 +257,25 @@ function execCommand(command, value = null) {
   editorRef.value?.focus()
 }
 
-function applyStyle() {
-  execCommand('fontSize', fontSize.value)
+function applyFontSize() {
+  // Wrap selected text in span with relative font size
+  const selection = window.getSelection()
+  if (selection.rangeCount > 0) {
+    const range = selection.getRangeAt(0)
+    const selectedText = range.toString()
+
+    if (selectedText) {
+      const span = document.createElement('span')
+      span.style.fontSize = fontSize.value
+      span.textContent = selectedText
+      range.deleteContents()
+      range.insertNode(span)
+
+      // Update content
+      updateContent()
+    }
+  }
+  editorRef.value?.focus()
 }
 
 function applyTextColor() {
@@ -255,12 +304,55 @@ function closeModal() {
 
 function resetForm() {
   slideTitle.value = ''
-  contentHtml.value = '<p style="text-align: center; font-size: 32px; color: white;">Type your content here...</p>'
+  contentHtml.value = 'Type your content here...'
   backgroundColor.value = '#1a1a1a'
-  fontSize.value = '3'
+  fontSize.value = '1em'
   textColor.value = '#ffffff'
   if (editorRef.value) {
     editorRef.value.innerHTML = contentHtml.value
   }
 }
 </script>
+
+<style scoped>
+/* Normalize font sizes in editor and preview for consistent line heights */
+.custom-editor :deep(span[style*="font-size: 0.7em"]) {
+  font-size: 0.7em !important;
+  line-height: 1.8 !important;
+}
+
+.custom-editor :deep(span[style*="font-size: 1em"]) {
+  font-size: 1em !important;
+  line-height: 1.6 !important;
+}
+
+.custom-editor :deep(span[style*="font-size: 1.5em"]) {
+  font-size: 1.5em !important;
+  line-height: 1.4 !important;
+}
+
+.custom-editor :deep(span[style*="font-size: 2em"]) {
+  font-size: 2em !important;
+  line-height: 1.3 !important;
+}
+
+.custom-preview :deep(span[style*="font-size: 0.7em"]) {
+  font-size: 0.7em !important;
+  line-height: 1.8 !important;
+}
+
+.custom-preview :deep(span[style*="font-size: 1em"]) {
+  font-size: 1em !important;
+  line-height: 1.6 !important;
+}
+
+.custom-preview :deep(span[style*="font-size: 1.5em"]) {
+  font-size: 1.5em !important;
+  line-height: 1.4 !important;
+}
+
+.custom-preview :deep(span[style*="font-size: 2em"]) {
+  font-size: 2em !important;
+  line-height: 1.3 !important;
+}
+</style>

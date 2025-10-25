@@ -179,17 +179,13 @@ export function usePresentation() {
     console.log('goNextSlideInLiveStack:', { currentSlide: liveSlideIndex.value, totalSlides: stack.slides.length, repeat, isAtEnd: liveSlideIndex.value >= stack.slides.length - 1 })
 
     if (liveSlideIndex.value < stack.slides.length - 1) {
-      // Go to next slide in stack
+      // Go to next slide in stack (only update LIVE, not staged)
       liveSlideIndex.value++
-      // Also advance staged to match
-      stagedStackIndex.value = liveStackIndex.value
-      stagedSlideIndex.value = liveSlideIndex.value
-      console.log('Advanced to next slide:', liveSlideIndex.value)
+      console.log('Auto-advanced to next slide (live only):', liveSlideIndex.value)
     } else if (repeat) {
-      // Loop back to first slide in stack
-      console.log('At end of stack, looping back to first slide')
+      // Loop back to first slide in stack (only update LIVE, not staged)
+      console.log('At end of stack, looping back to first slide (live only)')
       liveSlideIndex.value = 0
-      stagedSlideIndex.value = 0
     } else {
       // End of stack, stop auto-advance
       console.log('At end of stack, repeat is false, stopping')

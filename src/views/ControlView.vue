@@ -91,6 +91,29 @@
               </svg>
               <span class="flex-1 text-neutral-200 font-medium text-xs truncate cursor-pointer" @click="toggleStack(stackIndex)">{{ stack.title }}</span>
               <span class="text-xs text-neutral-500">{{ stack.slides.length }}</span>
+
+              <!-- Stack reorder buttons -->
+              <button
+                v-if="stackIndex > 0"
+                @click.stop="moveStackUp(stackIndex)"
+                class="p-0.5 hover:bg-neutral-600/50 rounded transition-colors"
+                title="Move stack up"
+              >
+                <svg class="w-2.5 h-2.5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                </svg>
+              </button>
+              <button
+                v-if="stackIndex < stacks.length - 1"
+                @click.stop="moveStackDown(stackIndex)"
+                class="p-0.5 hover:bg-neutral-600/50 rounded transition-colors"
+                title="Move stack down"
+              >
+                <svg class="w-2.5 h-2.5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
               <button
                 @click.stop="openStackSettings(stackIndex)"
                 class="p-0.5 hover:bg-neutral-600/50 rounded transition-colors"
@@ -119,7 +142,7 @@
               <div
                 v-for="(slide, slideIndex) in stack.slides"
                 :key="slideIndex"
-                class="flex items-center gap-2 px-2 py-1 rounded-md transition-all text-xs group"
+                class="flex items-center gap-1 px-2 py-1 rounded-md transition-all text-xs group"
                 :class="[
                   stackIndex === stagedStackIndex && slideIndex === stagedSlideIndex
                     ? 'bg-gold-500/20 text-gold-300'
@@ -129,6 +152,41 @@
                 <span class="text-[10px] text-neutral-600 w-4">{{ slideIndex + 1 }}</span>
                 <span class="flex-1 truncate cursor-pointer" @click="stageSlideInStack(stackIndex, slideIndex)">{{ slide.title || getSlideTypeName(slide.type) }}</span>
                 <span class="text-[10px]">{{ getSlideTypeIcon(slide.type) }}</span>
+
+                <!-- Reorder buttons -->
+                <button
+                  v-if="slideIndex > 0"
+                  @click.stop="moveSlideUp(stackIndex, slideIndex)"
+                  class="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-neutral-600/50 rounded transition-all"
+                  title="Move up"
+                >
+                  <svg class="w-2.5 h-2.5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                  </svg>
+                </button>
+                <button
+                  v-if="slideIndex < stack.slides.length - 1"
+                  @click.stop="moveSlideDown(stackIndex, slideIndex)"
+                  class="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-neutral-600/50 rounded transition-all"
+                  title="Move down"
+                >
+                  <svg class="w-2.5 h-2.5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                <!-- Edit button (only for custom and youtube) -->
+                <button
+                  v-if="slide.type === 'custom' || slide.type === 'youtube'"
+                  @click.stop="editSlide(stackIndex, slideIndex)"
+                  class="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-blue-500/20 rounded transition-all"
+                  title="Edit slide"
+                >
+                  <svg class="w-3 h-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+
                 <button
                   @click.stop="removeSlide(stackIndex, slideIndex)"
                   class="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-red-500/20 rounded transition-all"
@@ -350,8 +408,9 @@
     <!-- Dialogs -->
     <CustomSlideEditor
       :show="showCustomDialog"
-      @close="showCustomDialog = false"
-      @add="handleAddSlide"
+      :initialSlide="editingSlide"
+      @close="closeCustomDialog"
+      @add="handleAddOrUpdateSlide"
     />
     <AddBibleSlide
       :show="showBibleDialog"
@@ -360,8 +419,9 @@
     />
     <AddYouTubeSlide
       :show="showYouTubeDialog"
-      @close="showYouTubeDialog = false"
-      @add="handleAddSlide"
+      :initialSlide="editingSlide"
+      @close="closeYouTubeDialog"
+      @add="handleAddOrUpdateSlide"
     />
     <AddImageSlide
       :show="showImageDialog"
@@ -586,6 +646,9 @@ const availableMonitors = ref([])
 const selectedMonitor = ref(0)
 const currentStackForAdd = ref(null)
 const currentStackForSettings = ref(null)
+const editingSlide = ref(null)
+const editingStackIndex = ref(null)
+const editingSlideIndex = ref(null)
 const menuPosition = reactive({ x: 0, y: 0 })
 
 // Stack settings form
@@ -723,6 +786,132 @@ function removeSlide(stackIndex, slideIndex) {
 function removeStackConfirm(stackIndex) {
   if (confirm(`Delete stack "${stacks.value[stackIndex].title}"?`)) {
     removeStack(stackIndex)
+  }
+}
+
+// Edit slide
+function editSlide(stackIndex, slideIndex) {
+  const slide = stacks.value[stackIndex].slides[slideIndex]
+  editingSlide.value = { ...slide } // Clone the slide data
+  editingStackIndex.value = stackIndex
+  editingSlideIndex.value = slideIndex
+
+  // Open appropriate dialog based on slide type
+  if (slide.type === 'custom') {
+    showCustomDialog.value = true
+  } else if (slide.type === 'youtube') {
+    showYouTubeDialog.value = true
+  }
+}
+
+// Handle add or update slide
+function handleAddOrUpdateSlide(slideData) {
+  if (editingStackIndex.value !== null && editingSlideIndex.value !== null) {
+    // Update existing slide
+    stacks.value[editingStackIndex.value].slides[editingSlideIndex.value] = slideData
+    editingSlide.value = null
+    editingStackIndex.value = null
+    editingSlideIndex.value = null
+  } else if (currentStackForAdd.value !== null) {
+    // Add new slide
+    addSlideToStack(currentStackForAdd.value, slideData)
+  }
+  closeCustomDialog()
+  closeYouTubeDialog()
+}
+
+// Close dialog handlers that clear edit state
+function closeCustomDialog() {
+  showCustomDialog.value = false
+  editingSlide.value = null
+  editingStackIndex.value = null
+  editingSlideIndex.value = null
+}
+
+function closeYouTubeDialog() {
+  showYouTubeDialog.value = false
+  editingSlide.value = null
+  editingStackIndex.value = null
+  editingSlideIndex.value = null
+}
+
+// Move slide up
+function moveSlideUp(stackIndex, slideIndex) {
+  if (slideIndex > 0) {
+    const stack = stacks.value[stackIndex]
+    const temp = stack.slides[slideIndex]
+    stack.slides[slideIndex] = stack.slides[slideIndex - 1]
+    stack.slides[slideIndex - 1] = temp
+
+    // Update staged index if needed
+    if (stagedStackIndex.value === stackIndex && stagedSlideIndex.value === slideIndex) {
+      stagedSlideIndex.value--
+    } else if (stagedStackIndex.value === stackIndex && stagedSlideIndex.value === slideIndex - 1) {
+      stagedSlideIndex.value++
+    }
+  }
+}
+
+// Move slide down
+function moveSlideDown(stackIndex, slideIndex) {
+  const stack = stacks.value[stackIndex]
+  if (slideIndex < stack.slides.length - 1) {
+    const temp = stack.slides[slideIndex]
+    stack.slides[slideIndex] = stack.slides[slideIndex + 1]
+    stack.slides[slideIndex + 1] = temp
+
+    // Update staged index if needed
+    if (stagedStackIndex.value === stackIndex && stagedSlideIndex.value === slideIndex) {
+      stagedSlideIndex.value++
+    } else if (stagedStackIndex.value === stackIndex && stagedSlideIndex.value === slideIndex + 1) {
+      stagedSlideIndex.value--
+    }
+  }
+}
+
+// Move stack up
+function moveStackUp(stackIndex) {
+  if (stackIndex > 0) {
+    const temp = stacks.value[stackIndex]
+    stacks.value[stackIndex] = stacks.value[stackIndex - 1]
+    stacks.value[stackIndex - 1] = temp
+
+    // Update staged index if needed
+    if (stagedStackIndex.value === stackIndex) {
+      stagedStackIndex.value--
+    } else if (stagedStackIndex.value === stackIndex - 1) {
+      stagedStackIndex.value++
+    }
+
+    // Update live index if needed
+    if (liveStackIndex.value === stackIndex) {
+      liveStackIndex.value--
+    } else if (liveStackIndex.value === stackIndex - 1) {
+      liveStackIndex.value++
+    }
+  }
+}
+
+// Move stack down
+function moveStackDown(stackIndex) {
+  if (stackIndex < stacks.value.length - 1) {
+    const temp = stacks.value[stackIndex]
+    stacks.value[stackIndex] = stacks.value[stackIndex + 1]
+    stacks.value[stackIndex + 1] = temp
+
+    // Update staged index if needed
+    if (stagedStackIndex.value === stackIndex) {
+      stagedStackIndex.value++
+    } else if (stagedStackIndex.value === stackIndex + 1) {
+      stagedStackIndex.value--
+    }
+
+    // Update live index if needed
+    if (liveStackIndex.value === stackIndex) {
+      liveStackIndex.value++
+    } else if (liveStackIndex.value === stackIndex + 1) {
+      liveStackIndex.value--
+    }
   }
 }
 

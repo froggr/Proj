@@ -114,13 +114,18 @@
         <div
           v-else-if="slide && slide.type === 'custom'"
           :key="`custom-${slide.html.substring(0, 20)}`"
-          class="w-full h-full flex items-center justify-center"
+          class="w-full h-full flex items-center justify-center custom-slide-container"
           :style="{
             backgroundColor: slide.background || '#1a1a1a',
-            padding: '5vh 5vw'
+            padding: '8vh 10vw',
+            fontSize: '5vh'
           }"
         >
-          <div class="w-full h-full" v-html="slide.html"></div>
+          <div
+            class="w-full"
+            style="text-align: center; white-space: pre-wrap; line-height: 1.6;"
+            v-html="slide.html"
+          ></div>
         </div>
 
         <div
@@ -410,5 +415,26 @@ watch(() => [props.slide, props.isProjector], ([newSlide, isProj]) => {
 .none-enter-active,
 .none-leave-active {
   transition: none;
+}
+
+/* Custom slide font scaling - override old <font> tags with relative sizes */
+.custom-slide-container :deep(font[size="1"]),
+.custom-slide-container :deep(span[style*="font-size: 0.7em"]) {
+  font-size: 0.7em !important;
+}
+
+.custom-slide-container :deep(font[size="3"]),
+.custom-slide-container :deep(span[style*="font-size: 1em"]) {
+  font-size: 1em !important;
+}
+
+.custom-slide-container :deep(font[size="5"]),
+.custom-slide-container :deep(span[style*="font-size: 1.5em"]) {
+  font-size: 1.5em !important;
+}
+
+.custom-slide-container :deep(font[size="7"]),
+.custom-slide-container :deep(span[style*="font-size: 2em"]) {
+  font-size: 2em !important;
 }
 </style>

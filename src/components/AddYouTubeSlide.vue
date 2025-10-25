@@ -1,5 +1,5 @@
 <template>
-  <Modal :show="show" title="Add YouTube Video" @close="$emit('close')">
+  <Modal :show="show" :title="initialSlide ? 'Edit YouTube Video' : 'Add YouTube Video'" @close="$emit('close')">
     <div class="space-y-4">
       <div>
         <label class="block text-sm font-medium text-gray-300 mb-2">
@@ -53,7 +53,7 @@
           :disabled="!videoId"
           class="px-4 py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-semibold text-white transition-colors"
         >
-          Add Slide
+          {{ initialSlide ? 'Update Slide' : 'Add Slide' }}
         </button>
       </div>
     </div>
@@ -61,18 +61,31 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import Modal from './Modal.vue'
 
 const emit = defineEmits(['close', 'add'])
 
-defineProps({
-  show: Boolean
+const props = defineProps({
+  show: Boolean,
+  initialSlide: {
+    type: Object,
+    default: null
+  }
 })
 
 const youtubeUrl = ref('')
 const title = ref('')
 const videoId = ref('')
+
+// Watch for initialSlide changes to populate form when editing
+watch(() => props.initialSlide, (slide) => {
+  if (slide && slide.type === 'youtube') {
+    videoId.value = slide.videoId || ''
+    title.value = slide.title || ''
+    youtubeUrl.value = `https://www.youtube.com/watch?v=${slide.videoId}`
+  }
+}, { immediate: true })
 
 function extractVideoId() {
   const url = youtubeUrl.value
