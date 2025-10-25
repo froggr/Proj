@@ -17,15 +17,20 @@
       }"
     >
       <Transition :name="transitionType" mode="out-in">
-        <div v-if="!slide && !isProjector" :key="'no-slide'" class="text-gray-500 text-xl flex items-center justify-center h-full">
+        <div
+          v-if="!slide && !isProjector"
+          :key="'no-slide'"
+          class="text-gray-500 flex items-center justify-center h-full"
+          :style="{ fontSize: '2.5vh' }"
+        >
           No slide selected
         </div>
 
-        <div v-else-if="slide && slide.type === 'image'" :key="`image-${slide.imageUrl}`" class="w-full h-full flex items-center justify-center">
+        <div v-else-if="slide && slide.type === 'image'" :key="`image-${slide.imageUrl}`" class="w-full h-full">
           <img
             :src="slide.imageUrl"
             :alt="slide.title"
-            class="max-w-full max-h-full object-contain"
+            class="w-full h-full object-contain"
             loading="lazy"
           />
         </div>
@@ -33,20 +38,32 @@
         <div
           v-else-if="slide && slide.type === 'bible'"
           :key="`bible-${slide.reference}-${slide.text.substring(0, 20)}`"
-          class="w-full h-full flex items-center justify-center p-16"
-          :style="{ backgroundColor: slide.background || '#1a1a1a' }"
+          class="w-full h-full flex items-center justify-center"
+          :style="{
+            backgroundColor: slide.background || '#1a1a1a',
+            padding: '8vh 10vw'
+          }"
         >
-          <div class="text-center max-w-4xl">
-            <div class="text-2xl font-semibold mb-8 text-gray-400">
+          <div class="text-center" :style="{ maxWidth: '80vw' }">
+            <div
+              class="font-semibold text-gray-400"
+              :style="{ fontSize: '2.5vh', marginBottom: '4vh' }"
+            >
               {{ slide.reference }}
             </div>
             <div
-              class="text-4xl leading-relaxed"
-              :style="{ fontFamily: slide.font || 'Inter' }"
+              :style="{
+                fontFamily: slide.font || 'Inter',
+                fontSize: '4.2vh',
+                lineHeight: '1.6'
+              }"
             >
               {{ slide.text }}
             </div>
-            <div class="text-xl mt-8 text-gray-500">
+            <div
+              class="text-gray-500"
+              :style="{ fontSize: '2vh', marginTop: '4vh' }"
+            >
               {{ slide.translation }}
             </div>
           </div>
@@ -97,13 +114,21 @@
         <div
           v-else-if="slide && slide.type === 'custom'"
           :key="`custom-${slide.html.substring(0, 20)}`"
-          class="w-full h-full flex items-center justify-center p-16"
-          :style="{ backgroundColor: slide.background || '#1a1a1a' }"
+          class="w-full h-full flex items-center justify-center"
+          :style="{
+            backgroundColor: slide.background || '#1a1a1a',
+            padding: '5vh 5vw'
+          }"
         >
           <div class="w-full h-full" v-html="slide.html"></div>
         </div>
 
-        <div v-else-if="slide" :key="`unknown-${slide.type}`" class="text-gray-500 text-xl">
+        <div
+          v-else-if="slide"
+          :key="`unknown-${slide.type}`"
+          class="text-gray-500"
+          :style="{ fontSize: '2.5vh' }"
+        >
           Unknown slide type: {{ slide.type }}
         </div>
       </Transition>

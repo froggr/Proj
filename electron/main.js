@@ -136,39 +136,56 @@ function createMainWindow() {
 }
 
 function createProjectorWindow(monitorIndex = null) {
-  const displays = screen.getAllDisplays()
-  console.log('Available displays:', displays.length)
-  displays.forEach((d, i) => {
-    console.log(`  Display ${i}: ${d.bounds.width}x${d.bounds.height} at (${d.bounds.x}, ${d.bounds.y})`)
-  })
-
-  let targetDisplay = displays[0] // Default to primary
-  if (monitorIndex !== null && displays[monitorIndex]) {
-    targetDisplay = displays[monitorIndex]
-    console.log(`Selected display ${monitorIndex}`)
-  }
-
-  const { x, y, width, height } = targetDisplay.bounds
-  console.log(`Opening projector on display at (${x}, ${y}) with size ${width}x${height}`)
+  console.log('=====================================')
+  console.log('Opening projector window (Wayland-compatible mode)')
+  console.log('Instructions:')
+  console.log('  1. Drag the window to your projector/display')
+  console.log('  2. Press F11 to toggle fullscreen')
+  console.log('  3. Press Escape to exit fullscreen')
+  console.log('=====================================')
 
   projectorWindow = new BrowserWindow({
-    x,
-    y,
-    width,
-    height,
-    frame: false,
-    fullscreen: false,  // Explicitly disable fullscreen mode
-    skipTaskbar: true,
+    width: 1280,
+    height: 720,
+    frame: true,  // Keep frame so you can drag it
+    fullscreen: false,
+    skipTaskbar: false,  // Show in taskbar so it's easier to find
+    show: false,
+    alwaysOnTop: true,
+    backgroundColor: '#000000',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js')
     },
-    title: 'DongleControl Projector - Projector'
+    title: 'DongleControl Projector - Drag me to display, then press F11'
   })
 
-  // Maximize instead of fullscreen to respect the display bounds
-  projectorWindow.maximize()
+  projectorWindow.once('ready-to-show', () => {
+    projectorWindow.show()
+    console.log('✓ Projector window opened')
+    console.log('📌 Drag it to your target display, then press F11 for fullscreen')
+  })
+
+  // Keyboard shortcuts for fullscreen
+  projectorWindow.webContents.on('before-input-event', (event, input) => {
+    // F11 to toggle fullscreen
+    if (input.key === 'F11' && input.type === 'keyDown') {
+      const isFullScreen = projectorWindow.isFullScreen()
+      projectorWindow.setFullScreen(!isFullScreen)
+      console.log(isFullScreen ? '📺 Exited fullscreen' : '📺 Entered fullscreen')
+      event.preventDefault()
+    }
+
+    // Escape to exit fullscreen
+    if (input.key === 'Escape' && input.type === 'keyDown') {
+      if (projectorWindow.isFullScreen()) {
+        projectorWindow.setFullScreen(false)
+        console.log('📺 Exited fullscreen')
+        event.preventDefault()
+      }
+    }
+  })
 
   if (isDev) {
     const vitePort = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173'
