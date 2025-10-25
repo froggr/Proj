@@ -402,6 +402,7 @@
               <option value="video-end">Video End (Advance After Video)</option>
               <option value="youtube-end">YouTube End (Advance After YouTube)</option>
             </select>
+            <p class="mt-2 text-xs text-neutral-400">YouTube auto-advance: video will fade to black on completion</p>
           </div>
 
           <div v-if="stackSettingsForm.type === 'timer'">
@@ -430,6 +431,20 @@
             <label for="autoAdvanceRepeat" class="text-sm text-neutral-300">
               Repeat (Loop back to first slide)
             </label>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-neutral-300 mb-2">
+              Slide Transition Effect
+            </label>
+            <select
+              v-model="stackSettingsForm.transition"
+              class="w-full px-4 py-2 border border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-500"
+              style="background-color: #171717; color: white;"
+            >
+              <option value="instant">Instant</option>
+              <option value="fade">Fade (500ms)</option>
+            </select>
           </div>
         </div>
 
@@ -576,7 +591,8 @@ const stackSettingsForm = reactive({
   enabled: false,
   type: 'manual',
   delay: 5000,
-  repeat: false
+  repeat: false,
+  transition: 'fade'
 })
 
 // Aspect ratio dimensions - scaled to fit without scrolling
@@ -677,6 +693,7 @@ function openStackSettings(stackIndex) {
     stackSettingsForm.type = stack.autoAdvance.type
     stackSettingsForm.delay = stack.autoAdvance.delay
     stackSettingsForm.repeat = stack.autoAdvance.repeat
+    stackSettingsForm.transition = stack.autoAdvance.transition || 'fade'
   }
   showStackSettings.value = true
 }
@@ -687,7 +704,8 @@ function saveStackSettings() {
       enabled: stackSettingsForm.enabled,
       type: stackSettingsForm.type,
       delay: stackSettingsForm.delay,
-      repeat: stackSettingsForm.repeat
+      repeat: stackSettingsForm.repeat,
+      transition: stackSettingsForm.transition
     })
   }
   showStackSettings.value = false
@@ -729,13 +747,18 @@ function getSlideTypeIcon(type) {
 }
 
 async function toggleProjector() {
+  console.log('ControlView: toggleProjector called, isProjectorOpen:', isProjectorOpen.value)
   if (isProjectorOpen.value) {
     closeProjector()
   } else {
+    console.log('ControlView: Getting available monitors...')
     availableMonitors.value = await getAvailableMonitors()
+    console.log('ControlView: Available monitors:', availableMonitors.value)
     if (availableMonitors.value.length > 1) {
+      console.log('ControlView: Multiple monitors detected, showing dialog')
       showMonitorDialog.value = true
     } else {
+      console.log('ControlView: Single or no monitors, opening on default')
       openProjector(0)
     }
   }

@@ -17,7 +17,7 @@ const stacks = ref([
   {
     id: '1',
     title: 'Welcome',
-    autoAdvance: { enabled: false, type: 'manual', delay: 5000, repeat: false },
+    autoAdvance: { enabled: false, type: 'manual', delay: 5000, repeat: false, transition: 'fade' },
     slides: [
       {
         type: 'image',
@@ -29,7 +29,7 @@ const stacks = ref([
   {
     id: '2',
     title: 'Scripture',
-    autoAdvance: { enabled: false, type: 'manual', delay: 5000, repeat: false },
+    autoAdvance: { enabled: false, type: 'manual', delay: 5000, repeat: false, transition: 'fade' },
     slides: [
       {
         type: 'bible',
@@ -152,8 +152,11 @@ export function usePresentation() {
     if (!stack || !stack.autoAdvance.enabled) return
 
     const { type, repeat } = stack.autoAdvance
+    console.log('onVideoComplete:', { stackIndex: liveStackIndex.value, slideIndex: liveSlideIndex.value, type, repeat, totalSlides: stack.slides.length })
+
     if (type === 'video-end' || type === 'youtube-end') {
       goNextSlideInLiveStack(repeat)
+      console.log('After advance:', { stackIndex: liveStackIndex.value, slideIndex: liveSlideIndex.value })
     }
   }
 
@@ -164,18 +167,23 @@ export function usePresentation() {
     const stack = stacks.value[liveStackIndex.value]
     if (!stack) return
 
+    console.log('goNextSlideInLiveStack:', { currentSlide: liveSlideIndex.value, totalSlides: stack.slides.length, repeat, isAtEnd: liveSlideIndex.value >= stack.slides.length - 1 })
+
     if (liveSlideIndex.value < stack.slides.length - 1) {
       // Go to next slide in stack
       liveSlideIndex.value++
       // Also advance staged to match
       stagedStackIndex.value = liveStackIndex.value
       stagedSlideIndex.value = liveSlideIndex.value
+      console.log('Advanced to next slide:', liveSlideIndex.value)
     } else if (repeat) {
       // Loop back to first slide in stack
+      console.log('At end of stack, looping back to first slide')
       liveSlideIndex.value = 0
       stagedSlideIndex.value = 0
     } else {
       // End of stack, stop auto-advance
+      console.log('At end of stack, repeat is false, stopping')
       if (autoAdvanceTimer) {
         clearTimeout(autoAdvanceTimer)
         autoAdvanceTimer = null
@@ -249,7 +257,7 @@ export function usePresentation() {
     const newStack = {
       id: Date.now().toString(),
       title,
-      autoAdvance: { enabled: false, type: 'manual', delay: 5000, repeat: false },
+      autoAdvance: { enabled: false, type: 'manual', delay: 5000, repeat: false, transition: 'fade' },
       slides: []
     }
     stacks.value.push(newStack)

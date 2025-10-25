@@ -34,9 +34,9 @@
         </div>
       </div>
 
-      <div v-if="selectedFile">
+      <div v-if="selectedFiles.length > 0">
         <p class="text-sm text-gray-400">
-          Selected: <span class="text-white font-medium">{{ selectedFile }}</span>
+          Selected <span class="text-white font-medium">{{ selectedFiles.length }}</span> image(s)
         </p>
       </div>
 
@@ -58,7 +58,7 @@
         </label>
         <div class="bg-black rounded-lg overflow-hidden">
           <img
-            :src="imageUrl || `asset://localhost/${selectedFile}`"
+            :src="imageUrl || `file://${selectedFile}`"
             class="w-full h-auto"
             @error="handleImageError"
           />
@@ -100,26 +100,30 @@ defineProps({
 
 const imageUrl = ref('')
 const selectedFile = ref('')
+const selectedFiles = ref([])  // For multiple files
 const title = ref('')
 const error = ref('')
 
 async function selectFile() {
   try {
-    // We'll implement this with Tauri's file dialog
-    const { open } = await import('@tauri-apps/plugin-dialog')
+    if (!window.electronAPI) {
+      error.value = 'File dialog not available (Electron API not loaded)'
+      return
+    }
 
-    const file = await open({
-      multiple: false,
-      filters: [{
-        name: 'Images',
-        extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']
-      }]
-    })
+    // Use Electron's dialog to select multiple images
+    const result = await window.electronAPI.selectImages()
 
-    if (file) {
-      selectedFile.value = file
+    if (result.success && result.files && result.files.length > 0) {
+      selectedFiles.value = result.files
+      selectedFile.value = result.files[0]  // For preview
       imageUrl.value = '' // Clear URL if file is selected
       error.value = ''
+      console.log('Selected files:', result.files)
+    } else if (result.canceled) {
+      // User canceled, do nothing
+    } else {
+      error.value = result.error || 'Failed to select files'
     }
   } catch (err) {
     error.value = `Failed to select file: ${err.message}`
@@ -132,17 +136,30 @@ function handleImageError() {
 }
 
 function addSlide() {
-  const slide = {
-    type: 'image',
-    imageUrl: imageUrl.value || `asset://localhost/${selectedFile.value}`,
-    title: title.value || 'Image Slide'
+  // If multiple files selected, create multiple slides
+  if (selectedFiles.value.length > 1) {
+    selectedFiles.value.forEach((filePath, index) => {
+      const slide = {
+        type: 'image',
+        imageUrl: `file://${filePath}`,
+        title: title.value ? `${title.value} ${index + 1}` : `Image ${index + 1}`
+      }
+      emit('add', slide)
+    })
+  } else {
+    // Single slide
+    const slide = {
+      type: 'image',
+      imageUrl: imageUrl.value || `file://${selectedFile.value}`,
+      title: title.value || 'Image Slide'
+    }
+    emit('add', slide)
   }
-
-  emit('add', slide)
 
   // Reset
   imageUrl.value = ''
   selectedFile.value = ''
+  selectedFiles.value = []
   title.value = ''
   error.value = ''
 }

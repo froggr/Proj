@@ -125,13 +125,18 @@ function createMainWindow() {
 function createProjectorWindow(monitorIndex = null) {
   const displays = screen.getAllDisplays()
   console.log('Available displays:', displays.length)
+  displays.forEach((d, i) => {
+    console.log(`  Display ${i}: ${d.bounds.width}x${d.bounds.height} at (${d.bounds.x}, ${d.bounds.y})`)
+  })
 
   let targetDisplay = displays[0] // Default to primary
   if (monitorIndex !== null && displays[monitorIndex]) {
     targetDisplay = displays[monitorIndex]
+    console.log(`Selected display ${monitorIndex}`)
   }
 
   const { x, y, width, height } = targetDisplay.bounds
+  console.log(`Opening projector on display at (${x}, ${y}) with size ${width}x${height}`)
 
   projectorWindow = new BrowserWindow({
     x,
@@ -139,7 +144,7 @@ function createProjectorWindow(monitorIndex = null) {
     width,
     height,
     frame: false,
-    fullscreen: true,
+    fullscreen: false,  // Explicitly disable fullscreen mode
     skipTaskbar: true,
     webPreferences: {
       nodeIntegration: false,
@@ -148,6 +153,9 @@ function createProjectorWindow(monitorIndex = null) {
     },
     title: 'DongleControl Projector - Projector'
   })
+
+  // Maximize instead of fullscreen to respect the display bounds
+  projectorWindow.maximize()
 
   if (isDev) {
     const vitePort = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173'
@@ -168,9 +176,13 @@ function createProjectorWindow(monitorIndex = null) {
 // IPC Handlers
 ipcMain.handle('get-available-monitors', () => {
   const displays = screen.getAllDisplays()
-  return displays.map((display, index) =>
-    `Monitor ${index + 1} - ${display.size.width}x${display.size.height}`
-  )
+  console.log(`IPC: get-available-monitors returning ${displays.length} displays`)
+  const monitors = displays.map((display, index) => {
+    const isPrimary = display.id === screen.getPrimaryDisplay().id
+    return `Monitor ${index + 1}${isPrimary ? ' (Primary)' : ''} - ${display.bounds.width}x${display.bounds.height}`
+  })
+  console.log('Available monitors:', monitors)
+  return monitors
 })
 
 ipcMain.handle('open-projector-window', (event, monitorIndex) => {
@@ -257,6 +269,26 @@ ipcMain.handle('load-presentation', async () => {
     return { success: false, canceled: true }
   } catch (error) {
     console.error('Load failed:', error)
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('select-images', async () => {
+  try {
+    const { filePaths, canceled } = await dialog.showOpenDialog(mainWindow, {
+      title: 'Select Images',
+      filters: [
+        { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp'] }
+      ],
+      properties: ['openFile', 'multiSelections']  // Allow multiple files
+    })
+
+    if (!canceled && filePaths.length > 0) {
+      return { success: true, files: filePaths }
+    }
+    return { success: false, canceled: true }
+  } catch (error) {
+    console.error('Image selection failed:', error)
     return { success: false, error: error.message }
   }
 })

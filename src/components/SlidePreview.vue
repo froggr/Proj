@@ -53,7 +53,7 @@
 
     <div
       v-else-if="slide && slide.type === 'youtube'"
-      class="w-full h-full"
+      class="w-full h-full relative"
     >
       <iframe
         v-if="youtubeUrl"
@@ -65,6 +65,12 @@
         allow="autoplay; encrypted-media"
         allowfullscreen
       ></iframe>
+
+      <!-- Overlay that fades in when video ends (always show to hide related videos) -->
+      <div
+        class="absolute inset-0 bg-black transition-opacity duration-500 pointer-events-none"
+        :style="{ opacity: youtubeOverlayOpacity }"
+      ></div>
     </div>
 
     <div
@@ -101,7 +107,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 
 const props = defineProps({
   slide: {
@@ -125,6 +131,9 @@ const props = defineProps({
 const emit = defineEmits(['video-ended', 'youtube-ended'])
 
 const videoRef = ref(null)
+const youtubeVideoEnded = ref(false)
+const youtubeOverlayOpacity = ref(0)
+const youtubePlayerState = ref(null) // Track state to avoid duplicate events
 
 // YouTube iframe API
 const youtubeUrl = computed(() => {
@@ -134,8 +143,14 @@ const youtubeUrl = computed(() => {
     // Mute: MUST be muted for autoplay to work (browser policy)
     const mute = 1
 
-    // Use youtube.com (not youtube-nocookie) for better API support
-    const url = `https://www.youtube.com/embed/${props.slide.videoId}?autoplay=${autoplay}&mute=${mute}&controls=1&rel=0&modestbranding=1&enablejsapi=1`
+    // Build URL with parameters to configure YouTube UI
+    // Note: rel=0 no longer works on embedded players (YouTube changed this)
+    // We'll use CSS to hide related videos instead
+    // modestbranding=1: minimal YouTube branding
+    // fs=1: keep fullscreen for now (testing)
+    // iv_load_policy=3: hide video annotations
+    // controls=1: show controls for testing
+    const url = `https://www.youtube.com/embed/${props.slide.videoId}?autoplay=${autoplay}&mute=${mute}&controls=1&modestbranding=1&iv_load_policy=3&enablejsapi=1`
 
     console.log('YouTube URL generated:', url, 'isProjector:', props.isProjector)
     return url
@@ -165,50 +180,126 @@ watch(() => props.slide, (newSlide, oldSlide) => {
 }, { immediate: true })
 
 // YouTube iframe messaging for video control and end detection
+let youtubeMessageListener = null
+
 onMounted(() => {
   if (typeof window !== 'undefined') {
-    window.addEventListener('message', (event) => {
-      // Debug: Log ALL messages from YouTube origin
-      if (event.origin === 'https://www.youtube.com') {
-        console.log('SlidePreview: Received YouTube message:', event.data)
-      }
+    youtubeMessageListener = (event) => {
+      if (event.origin !== 'https://www.youtube.com') return
 
       if (event.data && typeof event.data === 'string') {
         try {
           const data = JSON.parse(event.data)
 
-          // Debug parsed data from YouTube
-          if (data.event) {
-            console.log('SlidePreview: Parsed YouTube event:', data)
-          }
+          // Skip onReady events - just noise
+          if (data.event === 'onReady') return
 
-          // When video starts playing on projector, unmute it
-          if (data.event === 'onStateChange' && data.info === 1 && props.isProjector) {
-            // State 1 = playing, unmute immediately
-            console.log('SlidePreview: Video started playing (state 1), unmuting')
-            if (youtubeIframeRef.value) {
-              youtubeIframeRef.value.contentWindow.postMessage(
-                '{"event":"command","func":"unMute","args":""}',
-                '*'
-              )
+          // Handle onStateChange events (standard API)
+          if (data.event === 'onStateChange') {
+            const state = data.info
+            const previousState = youtubePlayerState.value
+            console.log('onStateChange received, state:', state, 'previous:', previousState)
+
+            // Log state changes
+            if (state !== previousState) {
+              const stateNames = { '-1': 'unstarted', '0': 'ended', '1': 'playing', '2': 'paused', '3': 'buffering', '5': 'video cued' }
+              console.log('YouTube state changed:', stateNames[state] || `unknown (${state})`)
             }
+
+            // State 1 = playing, unmute on projector
+            if (state == 1 && props.isProjector) {  // loose equality to handle string "1"
+              if (youtubeIframeRef.value) {
+                youtubeIframeRef.value.contentWindow.postMessage(
+                  '{"event":"command","func":"unMute","args":""}',
+                  '*'
+                )
+              }
+            }
+
+            // State 0 = ended - check BEFORE updating youtubePlayerState
+            if (state == 0 && previousState != 0) {
+              console.log('STATE 0 DETECTED - calling handleVideoEnded()')
+              handleVideoEnded()
+            }
+
+            // NOW update the state for next time
+            youtubePlayerState.value = state
           }
 
-          // YouTube video ended (state 0 = ended)
-          if (data.event === 'onStateChange' && data.info === 0) {
-            console.log('SlidePreview: YouTube video ended (state 0), emitting youtube-ended event')
-            emit('youtube-ended')
+          // Handle infoDelivery events (sends playerState inside info object)
+          if (data.event === 'infoDelivery' && data.info && data.info.playerState !== undefined) {
+            const playerState = data.info.playerState
+            const currentTime = data.info.currentTime
+            const duration = data.info.duration
+            const previousState = youtubePlayerState.value
+
+            // Only log state changes, not every update
+            if (playerState !== previousState) {
+              const stateNames = { '-1': 'unstarted', '0': 'ended', '1': 'playing', '2': 'paused', '3': 'buffering', '5': 'video cued' }
+              console.log('YouTube state changed:', stateNames[playerState] || `unknown (${playerState})`)
+            }
+
+            // Unmute when playing on projector
+            if (playerState == 1 && props.isProjector) {  // loose equality to handle string "1"
+              if (youtubeIframeRef.value) {
+                youtubeIframeRef.value.contentWindow.postMessage(
+                  '{"event":"command","func":"unMute","args":""}',
+                  '*'
+                )
+              }
+            }
+
+            // Detect video end: playerState 0 means video ended
+            // Just check that we haven't already processed this state
+            if (playerState == 0 && previousState != 0) {
+              console.log('infoDelivery: Video ended (state 0), calling handleVideoEnded()')
+              handleVideoEnded()
+            }
+
+            // NOW update the state for next time
+            youtubePlayerState.value = playerState
           }
         } catch (e) {
           // Ignore non-JSON messages
         }
       }
-    })
+    }
+
+    window.addEventListener('message', youtubeMessageListener)
   }
 })
 
+// Clean up event listener when component unmounts
+onBeforeUnmount(() => {
+  if (youtubeMessageListener && typeof window !== 'undefined') {
+    window.removeEventListener('message', youtubeMessageListener)
+  }
+})
+
+// Helper function to handle video ended
+function handleVideoEnded() {
+  console.log('YouTube video ended - starting fade overlay')
+
+  // Fade in overlay before emitting event
+  youtubeOverlayOpacity.value = 0
+  setTimeout(() => {
+    youtubeOverlayOpacity.value = 1
+
+    // Emit event after overlay fades in (triggers auto-advance)
+    setTimeout(() => {
+      console.log('YouTube - emitting end event for auto-advance')
+      emit('youtube-ended')
+    }, 500) // Give overlay time to fade in
+  }, 100)
+}
+
 // Watch for YouTube videos on projector to unmute after autoplay starts
 watch(() => [props.slide, props.isProjector], ([newSlide, isProj]) => {
+  // Reset overlay state when slide changes
+  youtubeVideoEnded.value = false
+  youtubeOverlayOpacity.value = 0
+  youtubePlayerState.value = null  // IMPORTANT: Reset state tracking for new video
+
   if (newSlide?.type === 'youtube') {
     // Give iframe time to load
     setTimeout(() => {

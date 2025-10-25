@@ -28,5 +28,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // File operations
   savePresentation: (data) => ipcRenderer.invoke('save-presentation', data),
-  loadPresentation: () => ipcRenderer.invoke('load-presentation')
+  loadPresentation: () => ipcRenderer.invoke('load-presentation'),
+  selectImages: () => ipcRenderer.invoke('select-images')
 })
