@@ -19,7 +19,10 @@
       "electron/**/*"
     ],
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "category": "AudioVideo"
     }
   },
@@ -34,7 +37,7 @@
     "@tauri-apps/plugin-http": "^2",
     "@vitejs/plugin-vue": "^5.0.4",
     "autoprefixer": "^10.4.18",
-    "electron": "^38.4.0",
+    "electron": "^25.9.8",
     "electron-builder": "^26.0.12",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",

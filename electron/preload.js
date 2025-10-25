@@ -18,5 +18,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   removeUpdateSlideListener: () => {
     ipcRenderer.removeAllListeners('update-slide')
-  }
+  },
+
+  // File operations
+  savePresentation: (data) => ipcRenderer.invoke('save-presentation', data),
+  loadPresentation: () => ipcRenderer.invoke('load-presentation')
 })

@@ -1,3 +1,4 @@
+"use strict";
 const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("electronAPI", {
   // Monitor management
@@ -12,5 +13,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
   removeUpdateSlideListener: () => {
     ipcRenderer.removeAllListeners("update-slide");
-  }
+  },
+  // File operations
+  savePresentation: (data) => ipcRenderer.invoke("save-presentation", data),
+  loadPresentation: () => ipcRenderer.invoke("load-presentation")
 });

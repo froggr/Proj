@@ -101,6 +101,16 @@
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               </button>
+              <button
+                v-if="stacks.length > 1"
+                @click.stop="removeStackConfirm(stackIndex)"
+                class="p-0.5 hover:bg-red-500/20 rounded transition-colors"
+                title="Delete Stack"
+              >
+                <svg class="w-3 h-3 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
               <div v-if="stackIndex === liveStackIndex" class="w-1.5 h-1.5 bg-gold-500 rounded-full animate-pulse"></div>
             </div>
 
@@ -109,8 +119,7 @@
               <div
                 v-for="(slide, slideIndex) in stack.slides"
                 :key="slideIndex"
-                @click="stageSlideInStack(stackIndex, slideIndex)"
-                class="flex items-center gap-2 px-2 py-1 rounded-md cursor-pointer transition-all text-xs"
+                class="flex items-center gap-2 px-2 py-1 rounded-md transition-all text-xs group"
                 :class="[
                   stackIndex === stagedStackIndex && slideIndex === stagedSlideIndex
                     ? 'bg-gold-500/20 text-gold-300'
@@ -118,8 +127,17 @@
                 ]"
               >
                 <span class="text-[10px] text-neutral-600 w-4">{{ slideIndex + 1 }}</span>
-                <span class="flex-1 truncate">{{ slide.title || getSlideTypeName(slide.type) }}</span>
+                <span class="flex-1 truncate cursor-pointer" @click="stageSlideInStack(stackIndex, slideIndex)">{{ slide.title || getSlideTypeName(slide.type) }}</span>
                 <span class="text-[10px]">{{ getSlideTypeIcon(slide.type) }}</span>
+                <button
+                  @click.stop="removeSlide(stackIndex, slideIndex)"
+                  class="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-red-500/20 rounded transition-all"
+                  title="Delete slide"
+                >
+                  <svg class="w-3 h-3 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
               </div>
 
               <!-- Add Slide Button -->
@@ -507,7 +525,9 @@ const {
   stageStack,
   stageSlideInStack,
   addStack,
+  removeStack,
   addSlideToStack,
+  removeSlideFromStack,
   updateStackSettings,
   onVideoComplete,
   savePresentation: savePresentationData,
@@ -571,9 +591,12 @@ function toggleStack(stackIndex) {
 }
 
 function addNewStack() {
+  console.log('addNewStack called!')
   const title = prompt('Enter stack title:', 'New Stack')
+  console.log('Prompt returned:', title)
   if (title) {
     addStack(title)
+    console.log('Stack added')
   }
 }
 
@@ -649,6 +672,18 @@ function saveStackSettings() {
   currentStackForSettings.value = null
 }
 
+function removeSlide(stackIndex, slideIndex) {
+  if (confirm('Delete this slide?')) {
+    removeSlideFromStack(stackIndex, slideIndex)
+  }
+}
+
+function removeStackConfirm(stackIndex) {
+  if (confirm(`Delete stack "${stacks.value[stackIndex].title}"?`)) {
+    removeStack(stackIndex)
+  }
+}
+
 function getSlideTypeName(type) {
   const names = {
     custom: 'Custom',
@@ -698,21 +733,18 @@ async function newPresentation() {
 
 async function savePresentation() {
   try {
-    const { save } = await import('@tauri-apps/plugin-dialog')
-    const { writeTextFile } = await import('@tauri-apps/plugin-fs')
+    if (!window.electronAPI) {
+      alert('File operations not available')
+      return
+    }
 
-    const filePath = await save({
-      defaultPath: 'presentation.json',
-      filters: [{
-        name: 'JSON',
-        extensions: ['json']
-      }]
-    })
+    const data = savePresentationData()
+    const result = await window.electronAPI.savePresentation(data)
 
-    if (filePath) {
-      const data = savePresentationData()
-      await writeTextFile(filePath, data)
+    if (result.success) {
       alert('Presentation saved successfully!')
+    } else if (!result.canceled) {
+      alert('Failed to save presentation: ' + (result.error || 'Unknown error'))
     }
   } catch (error) {
     console.error('Failed to save presentation:', error)
@@ -722,21 +754,18 @@ async function savePresentation() {
 
 async function loadPresentation() {
   try {
-    const { open } = await import('@tauri-apps/plugin-dialog')
-    const { readTextFile } = await import('@tauri-apps/plugin-fs')
+    if (!window.electronAPI) {
+      alert('File operations not available')
+      return
+    }
 
-    const filePath = await open({
-      multiple: false,
-      filters: [{
-        name: 'JSON',
-        extensions: ['json']
-      }]
-    })
+    const result = await window.electronAPI.loadPresentation()
 
-    if (filePath) {
-      const data = await readTextFile(filePath)
-      loadPresentationData(data)
+    if (result.success) {
+      loadPresentationData(result.data)
       alert('Presentation loaded successfully!')
+    } else if (!result.canceled) {
+      alert('Failed to load presentation: ' + (result.error || 'Unknown error'))
     }
   } catch (error) {
     console.error('Failed to load presentation:', error)

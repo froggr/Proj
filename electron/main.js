@@ -1,5 +1,20 @@
-const { app, BrowserWindow, ipcMain, screen } = require('electron')
+const { app, BrowserWindow, ipcMain, screen, dialog, Menu } = require('electron')
 const path = require('path')
+const fs = require('fs')
+
+// Force X11 instead of Wayland for better compatibility (especially with Cosmic DE)
+console.log('Forcing X11/XWayland for Wayland compatibility')
+app.commandLine.appendSwitch('--ozone-platform=x11')
+
+// Disable GPU acceleration to fix Linux rendering issues
+console.log('Disabling GPU acceleration for Linux compatibility')
+app.disableHardwareAcceleration()
+app.commandLine.appendSwitch('--no-sandbox')
+app.commandLine.appendSwitch('--disable-gpu')
+app.commandLine.appendSwitch('--disable-software-rasterizer')
+app.commandLine.appendSwitch('--disable-gpu-compositing')
+app.commandLine.appendSwitch('--disable-dev-shm-usage')
+console.log('GPU switches applied')
 
 // Keep references to windows to prevent garbage collection
 let mainWindow = null
@@ -19,12 +34,54 @@ function createMainWindow() {
     title: 'DongleControl Projector'
   })
 
+  // Create application menu with dev tools
+  const template = [
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { type: 'separator' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' }
+      ]
+    }
+  ]
+  const menu = Menu.buildFromTemplate(template)
+  Menu.setApplicationMenu(menu)
+
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5173') // Vite dev server
-    mainWindow.webContents.openDevTools()
+    // Use environment variable for Vite port, fallback to 5173
+    const vitePort = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173'
+    console.log('Loading main window from:', vitePort)
+    mainWindow.loadURL(vitePort)
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
   }
+
+  // Log when page finishes loading
+  mainWindow.webContents.on('did-finish-load', () => {
+    console.log('Main window finished loading')
+  })
+
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    console.error('Main window failed to load:', errorCode, errorDescription)
+  })
+
+  // Keyboard shortcuts
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.control && input.shift && input.key.toLowerCase() === 'i') {
+      mainWindow.webContents.toggleDevTools()
+      event.preventDefault()
+    }
+    if (input.key === 'F12') {
+      mainWindow.webContents.toggleDevTools()
+      event.preventDefault()
+    }
+  })
 
   mainWindow.on('closed', () => {
     mainWindow = null
@@ -59,8 +116,8 @@ function createProjectorWindow(monitorIndex = null) {
   })
 
   if (isDev) {
-    projectorWindow.loadURL('http://localhost:5173/projector')
-    // Don't open dev tools on projector in production
+    const vitePort = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173'
+    projectorWindow.loadURL(vitePort + '/projector')
   } else {
     projectorWindow.loadFile(path.join(__dirname, '../dist/index.html'), {
       hash: '/projector'
@@ -114,6 +171,51 @@ ipcMain.handle('update-projector', (event, slideData) => {
   } else {
     console.log('Main: Projector window not available')
     return { success: false, error: 'Projector window not open' }
+  }
+})
+
+// File dialog handlers
+ipcMain.handle('save-presentation', async (event, data) => {
+  try {
+    const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
+      title: 'Save Presentation',
+      defaultPath: 'presentation.json',
+      filters: [
+        { name: 'JSON Files', extensions: ['json'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    })
+
+    if (!canceled && filePath) {
+      fs.writeFileSync(filePath, data, 'utf-8')
+      return { success: true, filePath }
+    }
+    return { success: false, canceled: true }
+  } catch (error) {
+    console.error('Save failed:', error)
+    return { success: false, error: error.message }
+  }
+})
+
+ipcMain.handle('load-presentation', async () => {
+  try {
+    const { filePaths, canceled } = await dialog.showOpenDialog(mainWindow, {
+      title: 'Load Presentation',
+      filters: [
+        { name: 'JSON Files', extensions: ['json'] },
+        { name: 'All Files', extensions: ['*'] }
+      ],
+      properties: ['openFile']
+    })
+
+    if (!canceled && filePaths.length > 0) {
+      const data = fs.readFileSync(filePaths[0], 'utf-8')
+      return { success: true, data }
+    }
+    return { success: false, canceled: true }
+  } catch (error) {
+    console.error('Load failed:', error)
+    return { success: false, error: error.message }
   }
 })
 

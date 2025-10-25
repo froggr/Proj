@@ -1,5 +1,17 @@
-const { app, BrowserWindow, ipcMain, screen } = require("electron");
+"use strict";
+const { app, BrowserWindow, ipcMain, screen, dialog, Menu } = require("electron");
 const path = require("path");
+const fs = require("fs");
+console.log("Forcing X11/XWayland for Wayland compatibility");
+app.commandLine.appendSwitch("--ozone-platform=x11");
+console.log("Disabling GPU acceleration for Linux compatibility");
+app.disableHardwareAcceleration();
+app.commandLine.appendSwitch("--no-sandbox");
+app.commandLine.appendSwitch("--disable-gpu");
+app.commandLine.appendSwitch("--disable-software-rasterizer");
+app.commandLine.appendSwitch("--disable-gpu-compositing");
+app.commandLine.appendSwitch("--disable-dev-shm-usage");
+console.log("GPU switches applied");
 let mainWindow = null;
 let projectorWindow = null;
 const isDev = process.env.NODE_ENV !== "production";
@@ -14,12 +26,46 @@ function createMainWindow() {
     },
     title: "DongleControl Projector"
   });
+  const template = [
+    {
+      label: "View",
+      submenu: [
+        { role: "reload" },
+        { role: "forceReload" },
+        { type: "separator" },
+        { role: "toggleDevTools" },
+        { type: "separator" },
+        { role: "resetZoom" },
+        { role: "zoomIn" },
+        { role: "zoomOut" }
+      ]
+    }
+  ];
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
   if (isDev) {
-    mainWindow.loadURL("http://localhost:5173");
-    mainWindow.webContents.openDevTools();
+    const vitePort = process.env.VITE_DEV_SERVER_URL || "http://localhost:5173";
+    console.log("Loading main window from:", vitePort);
+    mainWindow.loadURL(vitePort);
   } else {
     mainWindow.loadFile(path.join(__dirname, "../dist/index.html"));
   }
+  mainWindow.webContents.on("did-finish-load", () => {
+    console.log("Main window finished loading");
+  });
+  mainWindow.webContents.on("did-fail-load", (event, errorCode, errorDescription) => {
+    console.error("Main window failed to load:", errorCode, errorDescription);
+  });
+  mainWindow.webContents.on("before-input-event", (event, input) => {
+    if (input.control && input.shift && input.key.toLowerCase() === "i") {
+      mainWindow.webContents.toggleDevTools();
+      event.preventDefault();
+    }
+    if (input.key === "F12") {
+      mainWindow.webContents.toggleDevTools();
+      event.preventDefault();
+    }
+  });
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
@@ -48,7 +94,8 @@ function createProjectorWindow(monitorIndex = null) {
     title: "DongleControl Projector - Projector"
   });
   if (isDev) {
-    projectorWindow.loadURL("http://localhost:5173/projector");
+    const vitePort = process.env.VITE_DEV_SERVER_URL || "http://localhost:5173";
+    projectorWindow.loadURL(vitePort + "/projector");
   } else {
     projectorWindow.loadFile(path.join(__dirname, "../dist/index.html"), {
       hash: "/projector"
@@ -94,6 +141,46 @@ ipcMain.handle("update-projector", (event, slideData) => {
   } else {
     console.log("Main: Projector window not available");
     return { success: false, error: "Projector window not open" };
+  }
+});
+ipcMain.handle("save-presentation", async (event, data) => {
+  try {
+    const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
+      title: "Save Presentation",
+      defaultPath: "presentation.json",
+      filters: [
+        { name: "JSON Files", extensions: ["json"] },
+        { name: "All Files", extensions: ["*"] }
+      ]
+    });
+    if (!canceled && filePath) {
+      fs.writeFileSync(filePath, data, "utf-8");
+      return { success: true, filePath };
+    }
+    return { success: false, canceled: true };
+  } catch (error) {
+    console.error("Save failed:", error);
+    return { success: false, error: error.message };
+  }
+});
+ipcMain.handle("load-presentation", async () => {
+  try {
+    const { filePaths, canceled } = await dialog.showOpenDialog(mainWindow, {
+      title: "Load Presentation",
+      filters: [
+        { name: "JSON Files", extensions: ["json"] },
+        { name: "All Files", extensions: ["*"] }
+      ],
+      properties: ["openFile"]
+    });
+    if (!canceled && filePaths.length > 0) {
+      const data = fs.readFileSync(filePaths[0], "utf-8");
+      return { success: true, data };
+    }
+    return { success: false, canceled: true };
+  } catch (error) {
+    console.error("Load failed:", error);
+    return { success: false, error: error.message };
   }
 });
 app.whenReady().then(() => {
