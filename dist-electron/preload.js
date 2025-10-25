@@ -22,5 +22,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // File operations
   savePresentation: (data) => ipcRenderer.invoke("save-presentation", data),
   loadPresentation: () => ipcRenderer.invoke("load-presentation"),
-  selectImages: () => ipcRenderer.invoke("select-images")
+  selectImages: () => ipcRenderer.invoke("select-images"),
+  // Window controls
+  windowMinimize: () => ipcRenderer.invoke("window-minimize"),
+  windowMaximize: () => ipcRenderer.invoke("window-maximize"),
+  windowClose: () => ipcRenderer.invoke("window-close")
 });

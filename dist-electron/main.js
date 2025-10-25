@@ -34,6 +34,8 @@ function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
+    frame: false,
+    // Frameless window for custom title bar
     webPreferences: {
       devTools: true,
       preload: path.join(__dirname, "preload.js"),
@@ -210,6 +212,25 @@ ipcMain.on("video-ended", () => {
   console.log("Main: Video ended notification from projector, forwarding to control window");
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("video-ended-notification");
+  }
+});
+ipcMain.handle("window-minimize", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.minimize();
+  }
+});
+ipcMain.handle("window-maximize", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow.maximize();
+    }
+  }
+});
+ipcMain.handle("window-close", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.close();
   }
 });
 ipcMain.handle("save-presentation", async (event, data) => {
