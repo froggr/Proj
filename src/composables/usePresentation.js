@@ -290,12 +290,16 @@ export function usePresentation() {
 
   function removeSlideFromStack(stackIndex, slideIndex) {
     const stack = stacks.value[stackIndex]
-    if (stack && stack.slides.length > 1 && slideIndex >= 0 && slideIndex < stack.slides.length) {
+    if (stack && slideIndex >= 0 && slideIndex < stack.slides.length) {
       stack.slides.splice(slideIndex, 1)
 
       // Adjust staged index if needed
-      if (stagedStackIndex.value === stackIndex && stagedSlideIndex.value >= stack.slides.length) {
-        stagedSlideIndex.value = stack.slides.length - 1
+      if (stagedStackIndex.value === stackIndex) {
+        if (stack.slides.length === 0) {
+          stagedSlideIndex.value = 0
+        } else if (stagedSlideIndex.value >= stack.slides.length) {
+          stagedSlideIndex.value = stack.slides.length - 1
+        }
       }
 
       // Clear live if it was the removed slide
