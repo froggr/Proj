@@ -44,14 +44,14 @@
           <div class="text-center" :style="{ maxWidth: '768px' }">
             <div
               class="font-semibold text-gray-400"
-              :style="{ fontSize: '14px', marginBottom: '22px' }"
+              :style="{ fontSize: scaledFontSizes.bibleReference, marginBottom: '22px' }"
             >
               {{ slide.reference }}
             </div>
             <div
               :style="{
                 fontFamily: slide.font || 'Inter',
-                fontSize: '24px',
+                fontSize: scaledFontSizes.bibleText,
                 lineHeight: '1.6'
               }"
             >
@@ -59,7 +59,7 @@
             </div>
             <div
               class="text-gray-500"
-              :style="{ fontSize: '11px', marginTop: '22px' }"
+              :style="{ fontSize: scaledFontSizes.bibleTranslation, marginTop: '22px' }"
             >
               {{ slide.translation }}
             </div>
@@ -115,7 +115,7 @@
           :style="{
             backgroundColor: slide.background || '#1a1a1a',
             padding: '43px 96px',
-            fontSize: '27px'
+            fontSize: scaledFontSizes.customText
           }"
         >
           <div
@@ -218,10 +218,25 @@ const props = defineProps({
   libraryRoot: {
     type: String,
     default: null
+  },
+  textScale: {
+    type: Number,
+    default: 100 // 100 = 100% = 1.0x
   }
 })
 
 const emit = defineEmits(['video-ended', 'youtube-ended'])
+
+// Compute scaled font sizes based on textScale prop
+const scaledFontSizes = computed(() => {
+  const multiplier = props.textScale / 100
+  return {
+    bibleReference: Math.round(14 * multiplier) + 'px',
+    bibleText: Math.round(24 * multiplier) + 'px',
+    bibleTranslation: Math.round(11 * multiplier) + 'px',
+    customText: Math.round(27 * multiplier) + 'px'
+  }
+})
 
 // Video/YouTube playback control state
 const isPlaying = ref(false)
@@ -243,39 +258,37 @@ async function resolveAssetUrl(assetUrl) {
   }
 
   if (!props.libraryRoot || !window.electronAPI) {
-    console.warn('Cannot resolve asset URL: library not open or Electron API not available')
+    console.warn('SlidePreview: Cannot resolve asset URL - library not open or Electron API not available', {
+      assetUrl,
+      hasLibraryRoot: !!props.libraryRoot,
+      hasElectronAPI: !!window.electronAPI
+    })
     return assetUrl
   }
 
   try {
     // resolveAssetPath now returns local-image:// URLs directly
     const resolvedUrl = await window.electronAPI.resolveAssetPath(props.libraryRoot, assetUrl)
+    console.log('SlidePreview: Asset URL resolved', {
+      original: assetUrl,
+      resolved: resolvedUrl,
+      libraryRoot: props.libraryRoot
+    })
     return resolvedUrl || assetUrl
   } catch (error) {
-    console.error('Failed to resolve asset URL:', error)
+    console.error('SlidePreview: Failed to resolve asset URL:', assetUrl, error)
     return assetUrl
   }
 }
 
 // Watch for slide changes and resolve URLs
 // Also watch libraryRoot so URLs are re-resolved when library opens
-watch([() => props.slide, () => props.libraryRoot], async ([newSlide, newLibraryRoot]) => {
-  console.log('SlidePreview: URL resolution watch triggered', {
-    slideType: newSlide?.type,
-    imageUrl: newSlide?.imageUrl,
-    videoUrl: newSlide?.videoUrl,
-    libraryRoot: newLibraryRoot
-  })
-
+watch([() => props.slide, () => props.libraryRoot], async ([newSlide]) => {
   if (newSlide?.type === 'image' && newSlide.imageUrl) {
-    const resolved = await resolveAssetUrl(newSlide.imageUrl)
-    console.log('SlidePreview: Resolved image URL:', newSlide.imageUrl, '->', resolved)
-    resolvedImageUrl.value = resolved
+    resolvedImageUrl.value = await resolveAssetUrl(newSlide.imageUrl)
   }
   if (newSlide?.type === 'video' && newSlide.videoUrl) {
-    const resolved = await resolveAssetUrl(newSlide.videoUrl)
-    console.log('SlidePreview: Resolved video URL:', newSlide.videoUrl, '->', resolved)
-    resolvedVideoUrl.value = resolved
+    resolvedVideoUrl.value = await resolveAssetUrl(newSlide.videoUrl)
   }
 }, { immediate: true })
 
@@ -655,11 +668,22 @@ watch(() => [props.slide, props.isProjector], ([newSlide, isProj]) => {
           '*'
         )
 
-        // Request periodic updates for playback tracking
-        youtubeIframeRef.value.contentWindow.postMessage(
-          '{"event":"command","func":"getVideoUrl","args":""}',
-          '*'
-        )
+        // Request player state to get duration (triggers infoDelivery)
+        const requestInfo = () => {
+          if (youtubeIframeRef.value) {
+            youtubeIframeRef.value.contentWindow.postMessage(
+              '{"event":"command","func":"getPlayerState","args":""}',
+              '*'
+            )
+          }
+        }
+
+        // Request immediately and then every 500ms
+        requestInfo()
+        const intervalId = setInterval(requestInfo, 500)
+
+        // Clear interval when slide changes (this watch will re-run)
+        setTimeout(() => clearInterval(intervalId), 10000)
 
         // If on projector, also unmute after autoplay
         if (isProj) {

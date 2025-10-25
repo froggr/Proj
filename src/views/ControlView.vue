@@ -123,16 +123,55 @@
       </div>
 
       <div class="flex items-center gap-4">
-        <!-- Aspect Ratio Selector -->
-        <select
-          v-model="aspectRatio"
-          class="px-3 py-1.5 text-xs border border-gold-500/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-500 font-medium hover:border-gold-500 transition-colors"
-          style="background-color: #171717; color: white;"
-        >
-          <option value="16:9-720">720p (16:9)</option>
-          <option value="16:9-1080">1080p (16:9)</option>
-          <option value="16:9-4k">4K (16:9)</option>
-        </select>
+        <!-- Display Settings Dropdown -->
+        <div class="relative z-[200]">
+          <button
+            @click="showDisplaySettings = !showDisplaySettings"
+            class="px-3 py-1.5 text-xs font-medium text-neutral-300 hover:text-gold-500 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 rounded-lg transition-all flex items-center gap-2"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+            </svg>
+            Display
+          </button>
+
+          <div v-if="showDisplaySettings" class="absolute top-full right-0 mt-1 bg-neutral-800 border border-neutral-700 rounded-lg shadow-xl py-3 px-4 min-w-[260px] z-[200]">
+            <!-- Aspect Ratio -->
+            <div class="mb-4">
+              <label class="block text-xs font-medium text-neutral-400 mb-2">Aspect Ratio</label>
+              <select
+                v-model="aspectRatio"
+                class="w-full px-3 py-2 text-xs border border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-500 font-medium hover:border-gold-500 transition-colors"
+                style="background-color: #171717; color: white;"
+              >
+                <option value="16:9-720">720p (16:9)</option>
+                <option value="16:9-1080">1080p (16:9)</option>
+                <option value="16:9-4k">4K (16:9)</option>
+              </select>
+            </div>
+
+            <!-- Text Scale -->
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <label class="text-xs font-medium text-neutral-400">Text Scale</label>
+                <span class="text-xs font-bold text-gold-500">{{ textScale }}%</span>
+              </div>
+              <input
+                v-model.number="textScale"
+                type="range"
+                min="50"
+                max="200"
+                step="10"
+                class="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-gold-500"
+              />
+              <div class="relative w-full text-[10px] text-neutral-500 mt-1.5">
+                <span class="absolute left-0 -translate-x-1/2">50%</span>
+                <span class="absolute left-1/3 -translate-x-1/2">100%</span>
+                <span class="absolute right-0 translate-x-1/2">200%</span>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <button
           @click="toggleProjector"
@@ -380,6 +419,7 @@
               :slide="currentSlide"
               :isStaged="true"
               :library-root="libraryRoot"
+              :text-scale="textScale"
               :transitionType="currentStack?.autoAdvance?.transition || 'none'"
               @video-ended="onVideoComplete"
               @youtube-ended="onVideoComplete"
@@ -403,6 +443,7 @@
             :slide="liveSlide"
             :scale="0.2"
             :library-root="libraryRoot"
+            :text-scale="textScale"
             :transitionType="liveStack?.autoAdvance?.transition || 'none'"
             @video-ended="onVideoComplete"
             @youtube-ended="onVideoComplete"
@@ -442,7 +483,7 @@
               ]"
             >
               <div class="w-full h-full bg-black relative">
-                <SlidePreview :slide="slide" :scale="0.1" :library-root="libraryRoot" />
+                <SlidePreview :slide="slide" :scale="0.1" :library-root="libraryRoot" :text-scale="textScale" />
                 <div class="absolute bottom-0.5 left-0.5 px-1 py-0.5 bg-black/80 text-[9px] text-neutral-400 font-medium rounded">
                   {{ index + 1 }}
                 </div>
@@ -807,6 +848,7 @@ const {
 } = useLibrary()
 
 const aspectRatio = ref('16:9-1080')
+const textScale = ref(100) // 100 = 100% = 1.0x
 const expandedStacks = reactive({})
 const showCustomDialog = ref(false)
 const showBibleDialog = ref(false)
@@ -823,6 +865,7 @@ const showOpenLibraryDialog = ref(false)
 const showSelectEventDialog = ref(false)
 const showNewEventDialog = ref(false)
 const showFileMenu = ref(false)
+const showDisplaySettings = ref(false)
 const saveStatus = ref('') // 'saving', 'saved', ''
 const lastSaveTime = ref('')
 const availableMonitors = ref([])
@@ -1451,6 +1494,18 @@ watch(
   { deep: true }
 )
 
+// Watch textScale and save to localStorage
+watch(
+  () => textScale.value,
+  (newScale) => {
+    try {
+      localStorage.setItem('dc_textScale', newScale.toString())
+    } catch (e) {
+      console.warn('Failed to save text scale to localStorage:', e)
+    }
+  }
+)
+
 // Sync libraryRoot with usePresentation for asset resolution
 watch(
   () => libraryRoot.value,
@@ -1462,6 +1517,16 @@ watch(
 
 // Listen for video completion events from projector window
 onMounted(async () => {
+  // Load text scale from localStorage
+  try {
+    const savedTextScale = localStorage.getItem('dc_textScale')
+    if (savedTextScale) {
+      textScale.value = parseInt(savedTextScale, 10)
+    }
+  } catch (e) {
+    console.warn('Failed to load text scale from localStorage:', e)
+  }
+
   // Auto-open last library if one exists
   const lastLibraryPath = getLastLibraryPath()
   if (lastLibraryPath) {
