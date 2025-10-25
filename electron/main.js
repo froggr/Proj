@@ -174,6 +174,14 @@ ipcMain.handle('update-projector', (event, slideData) => {
   }
 })
 
+// Video completion notification from projector to control window
+ipcMain.on('video-ended', () => {
+  console.log('Main: Video ended notification from projector, forwarding to control window')
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('video-ended-notification')
+  }
+})
+
 // File dialog handlers
 ipcMain.handle('save-presentation', async (event, data) => {
   try {

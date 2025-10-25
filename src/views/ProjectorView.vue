@@ -1,6 +1,11 @@
 <template>
   <div class="w-screen h-screen bg-black">
-    <SlidePreview :slide="liveSlide" :is-projector="true" />
+    <SlidePreview
+      :slide="liveSlide"
+      :is-projector="true"
+      @video-ended="onVideoEnded"
+      @youtube-ended="onYouTubeEnded"
+    />
   </div>
 </template>
 
@@ -46,4 +51,19 @@ onUnmounted(() => {
     window.electronAPI.removeUpdateSlideListener()
   }
 })
+
+// Handle video/YouTube completion events
+function onVideoEnded() {
+  console.log('ProjectorView: Video ended, notifying control window')
+  if (window.electronAPI) {
+    window.electronAPI.notifyVideoEnded()
+  }
+}
+
+function onYouTubeEnded() {
+  console.log('ProjectorView: YouTube video ended, notifying control window')
+  if (window.electronAPI) {
+    window.electronAPI.notifyVideoEnded()
+  }
+}
 </script>

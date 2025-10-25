@@ -495,7 +495,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { usePresentation } from '../composables/usePresentation'
 import { useKeyboard } from '../composables/useKeyboard'
 import { useProjector } from '../composables/useProjector'
@@ -778,6 +778,17 @@ useKeyboard({
   onArrowLeft: prevSlide,
   onArrowRight: nextSlide,
   onEscape: clearProjection
+})
+
+// Listen for video completion events from projector window
+onMounted(() => {
+  if (window.electronAPI) {
+    console.log('ControlView: Setting up video-ended listener')
+    window.electronAPI.onVideoEnded(() => {
+      console.log('ControlView: Received video-ended notification from projector')
+      onVideoComplete()
+    })
+  }
 })
 </script>
 

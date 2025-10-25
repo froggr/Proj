@@ -20,6 +20,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeAllListeners('update-slide')
   },
 
+  // Video completion (from projector to control)
+  notifyVideoEnded: () => ipcRenderer.send('video-ended'),
+  onVideoEnded: (callback) => {
+    ipcRenderer.on('video-ended-notification', callback)
+  },
+
   // File operations
   savePresentation: (data) => ipcRenderer.invoke('save-presentation', data),
   loadPresentation: () => ipcRenderer.invoke('load-presentation')
