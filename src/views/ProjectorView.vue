@@ -5,8 +5,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
-import { listen } from '@tauri-apps/api/event'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import SlidePreview from '../components/SlidePreview.vue'
 
 console.log('ProjectorView: Script loading')
@@ -20,32 +19,31 @@ watch(liveSlide, (newSlide) => {
 
 console.log('ProjectorView: About to call onMounted')
 
-onMounted(async () => {
+onMounted(() => {
   console.log('ProjectorView: onMounted called')
-  // Set fullscreen before showing window to prevent flicker
-  try {
-    const { getCurrentWindow } = await import('@tauri-apps/api/window')
-    const currentWindow = getCurrentWindow()
-    await currentWindow.setFullscreen(true)
-  } catch (error) {
-    console.error('ProjectorView: Failed to set fullscreen:', error)
-  }
 
   // Listen for slide updates from the control window
-  try {
-    await listen('update-slide', (event) => {
+  if (window.electronAPI) {
+    console.log('ProjectorView: Setting up Electron listener')
+    window.electronAPI.onUpdateSlide((slideData) => {
       try {
-        const slideData = typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload
         console.log('ProjectorView: Received slide data:', slideData)
-        liveSlide.value = slideData
+        const slide = typeof slideData === 'string' ? JSON.parse(slideData) : slideData
+        liveSlide.value = slide
       } catch (error) {
         console.error('ProjectorView: Failed to parse slide data:', error)
         liveSlide.value = null
       }
     })
     console.log('ProjectorView: Listener set up successfully')
-  } catch (error) {
-    console.error('ProjectorView: Failed to set up listener:', error)
+  } else {
+    console.error('ProjectorView: electronAPI not available!')
+  }
+})
+
+onUnmounted(() => {
+  if (window.electronAPI) {
+    window.electronAPI.removeUpdateSlideListener()
   }
 })
 </script>

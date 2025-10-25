@@ -1,17 +1,32 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import electron from 'vite-plugin-electron'
+import renderer from 'vite-plugin-electron-renderer'
 
 export default defineConfig({
-  plugins: [vue()],
-  clearScreen: false,
+  plugins: [
+    vue(),
+    electron([
+      {
+        // Main process entry point
+        entry: 'electron/main.js',
+      },
+      {
+        // Preload script
+        entry: 'electron/preload.js',
+        onstart(options) {
+          // Notify the Renderer process to reload the page when the Preload scripts build is complete
+          options.reload()
+        },
+      },
+    ]),
+    renderer(),
+  ],
   server: {
-    port: 1420,
-    strictPort: true,
+    port: 5173, // Standard Vite port
   },
-  envPrefix: ['VITE_', 'TAURI_'],
   build: {
-    target: ['es2021', 'chrome100', 'safari13'],
-    minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
-    sourcemap: !!process.env.TAURI_DEBUG,
+    target: 'esnext',
+    outDir: 'dist',
   },
 })

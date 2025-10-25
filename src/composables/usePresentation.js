@@ -1,5 +1,4 @@
 import { ref, computed, watch } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
 
 // Stacks structure:
 // [
@@ -67,8 +66,10 @@ function updateProjector(liveSlide) {
     try {
       const slideJson = JSON.stringify(liveSlide)
       console.log('Control: Sending slide to projector:', slideJson)
-      await invoke('update_projector', { slideData: slideJson })
-      console.log('Control: Successfully sent to projector')
+      if (window.electronAPI) {
+        await window.electronAPI.updateProjector(slideJson)
+        console.log('Control: Successfully sent to projector')
+      }
     } catch (error) {
       console.error('Control: Failed to update projector:', error)
     }
