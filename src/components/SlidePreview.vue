@@ -209,14 +209,29 @@ onMounted(() => {
 
 // Watch for YouTube videos on projector to unmute after autoplay starts
 watch(() => [props.slide, props.isProjector], ([newSlide, isProj]) => {
-  if (newSlide?.type === 'youtube' && isProj) {
-    // Give iframe time to load and start playing
+  if (newSlide?.type === 'youtube') {
+    // Give iframe time to load
     setTimeout(() => {
       if (youtubeIframeRef.value) {
+        console.log('Setting up YouTube iframe listener for video:', newSlide.videoId)
+
+        // Tell YouTube to start sending us events
         youtubeIframeRef.value.contentWindow.postMessage(
-          '{"event":"command","func":"unMute","args":""}',
+          '{"event":"listening","id":"' + newSlide.videoId + '"}',
           '*'
         )
+
+        // If on projector, also unmute after autoplay
+        if (isProj) {
+          setTimeout(() => {
+            if (youtubeIframeRef.value) {
+              youtubeIframeRef.value.contentWindow.postMessage(
+                '{"event":"command","func":"unMute","args":""}',
+                '*'
+              )
+            }
+          }, 500)
+        }
       }
     }, 1000)
   }
