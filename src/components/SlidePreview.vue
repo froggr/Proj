@@ -16,92 +16,97 @@
         height: '100%'
       }"
     >
-      <div v-if="!slide && !isProjector" class="text-gray-500 text-xl flex items-center justify-center h-full">
-        No slide selected
-      </div>
-
-    <div v-else-if="slide && slide.type === 'image'" class="w-full h-full flex items-center justify-center">
-      <img
-        :key="slide.imageUrl"
-        :src="slide.imageUrl"
-        :alt="slide.title"
-        class="max-w-full max-h-full object-contain"
-        loading="lazy"
-      />
-    </div>
-
-    <div
-      v-else-if="slide && slide.type === 'bible'"
-      class="w-full h-full flex items-center justify-center p-16"
-      :style="{ backgroundColor: slide.background || '#1a1a1a' }"
-    >
-      <div class="text-center max-w-4xl">
-        <div class="text-2xl font-semibold mb-8 text-gray-400">
-          {{ slide.reference }}
+      <Transition :name="transitionType" mode="out-in">
+        <div v-if="!slide && !isProjector" :key="'no-slide'" class="text-gray-500 text-xl flex items-center justify-center h-full">
+          No slide selected
         </div>
+
+        <div v-else-if="slide && slide.type === 'image'" :key="`image-${slide.imageUrl}`" class="w-full h-full flex items-center justify-center">
+          <img
+            :src="slide.imageUrl"
+            :alt="slide.title"
+            class="max-w-full max-h-full object-contain"
+            loading="lazy"
+          />
+        </div>
+
         <div
-          class="text-4xl leading-relaxed"
-          :style="{ fontFamily: slide.font || 'Inter' }"
+          v-else-if="slide && slide.type === 'bible'"
+          :key="`bible-${slide.reference}-${slide.text.substring(0, 20)}`"
+          class="w-full h-full flex items-center justify-center p-16"
+          :style="{ backgroundColor: slide.background || '#1a1a1a' }"
         >
-          {{ slide.text }}
+          <div class="text-center max-w-4xl">
+            <div class="text-2xl font-semibold mb-8 text-gray-400">
+              {{ slide.reference }}
+            </div>
+            <div
+              class="text-4xl leading-relaxed"
+              :style="{ fontFamily: slide.font || 'Inter' }"
+            >
+              {{ slide.text }}
+            </div>
+            <div class="text-xl mt-8 text-gray-500">
+              {{ slide.translation }}
+            </div>
+          </div>
         </div>
-        <div class="text-xl mt-8 text-gray-500">
-          {{ slide.translation }}
+
+        <div
+          v-else-if="slide && slide.type === 'youtube'"
+          :key="`youtube-${slide.videoId}`"
+          class="w-full h-full relative"
+        >
+          <iframe
+            v-if="youtubeUrl"
+            ref="youtubeIframeRef"
+            :key="`${slide.videoId}-${isProjector ? 'projector' : 'control'}`"
+            :src="youtubeUrl"
+            class="w-full h-full"
+            frameborder="0"
+            allow="autoplay; encrypted-media"
+            allowfullscreen
+          ></iframe>
+
+          <!-- Overlay that fades in when video ends (always show to hide related videos) -->
+          <div
+            class="absolute inset-0 bg-black transition-opacity duration-500 pointer-events-none"
+            :style="{ opacity: youtubeOverlayOpacity }"
+          ></div>
         </div>
-      </div>
-    </div>
 
-    <div
-      v-else-if="slide && slide.type === 'youtube'"
-      class="w-full h-full relative"
-    >
-      <iframe
-        v-if="youtubeUrl"
-        ref="youtubeIframeRef"
-        :key="`${slide.videoId}-${isProjector ? 'projector' : 'control'}`"
-        :src="youtubeUrl"
-        class="w-full h-full"
-        frameborder="0"
-        allow="autoplay; encrypted-media"
-        allowfullscreen
-      ></iframe>
+        <div
+          v-else-if="slide && slide.type === 'video'"
+          :key="`video-${slide.videoUrl}`"
+          class="w-full h-full flex items-center justify-center bg-black"
+        >
+          <video
+            ref="videoRef"
+            :key="slide.videoUrl"
+            :src="slide.videoUrl"
+            class="max-w-full max-h-full"
+            :controls="!isProjector"
+            :autoplay="isProjector"
+            :muted="!isProjector"
+            playsinline
+            preload="auto"
+            @ended="onVideoEnded"
+          />
+        </div>
 
-      <!-- Overlay that fades in when video ends (always show to hide related videos) -->
-      <div
-        class="absolute inset-0 bg-black transition-opacity duration-500 pointer-events-none"
-        :style="{ opacity: youtubeOverlayOpacity }"
-      ></div>
-    </div>
+        <div
+          v-else-if="slide && slide.type === 'custom'"
+          :key="`custom-${slide.html.substring(0, 20)}`"
+          class="w-full h-full flex items-center justify-center p-16"
+          :style="{ backgroundColor: slide.background || '#1a1a1a' }"
+        >
+          <div class="w-full h-full" v-html="slide.html"></div>
+        </div>
 
-    <div
-      v-else-if="slide && slide.type === 'video'"
-      class="w-full h-full flex items-center justify-center bg-black"
-    >
-      <video
-        ref="videoRef"
-        :key="slide.videoUrl"
-        :src="slide.videoUrl"
-        class="max-w-full max-h-full"
-        :controls="!isProjector"
-        :autoplay="isProjector"
-        :muted="!isProjector"
-        playsinline
-        preload="auto"
-        @ended="onVideoEnded"
-      />
-    </div>
-
-    <div
-      v-else-if="slide && slide.type === 'custom'"
-      class="w-full h-full flex items-center justify-center p-16"
-      :style="{ backgroundColor: slide.background || '#1a1a1a' }"
-    >
-      <div class="w-full h-full" v-html="slide.html"></div>
-    </div>
-
-    <div v-else-if="slide" class="text-gray-500 text-xl">
-      Unknown slide type: {{ slide.type }}
-    </div>
+        <div v-else-if="slide" :key="`unknown-${slide.type}`" class="text-gray-500 text-xl">
+          Unknown slide type: {{ slide.type }}
+        </div>
+      </Transition>
     </div>
   </div>
 </template>
@@ -125,6 +130,10 @@ const props = defineProps({
   isStaged: {
     type: Boolean,
     default: false
+  },
+  transitionType: {
+    type: String,
+    default: 'none'
   }
 })
 
@@ -144,13 +153,17 @@ const youtubeUrl = computed(() => {
     const mute = 1
 
     // Build URL with parameters to configure YouTube UI
-    // Note: rel=0 no longer works on embedded players (YouTube changed this)
-    // We'll use CSS to hide related videos instead
     // modestbranding=1: minimal YouTube branding
-    // fs=1: keep fullscreen for now (testing)
+    // color=white: white progress bar (cleaner)
+    // rel=0: show related videos from same channel only
+    // fs=0: disable fullscreen button on projector (controlled from control window)
     // iv_load_policy=3: hide video annotations
-    // controls=1: show controls for testing
-    const url = `https://www.youtube.com/embed/${props.slide.videoId}?autoplay=${autoplay}&mute=${mute}&controls=1&modestbranding=1&iv_load_policy=3&enablejsapi=1`
+    // controls: show on control window, hide on projector for minimal UI
+    // disablekb=1: disable keyboard controls on projector
+    const controls = props.isProjector ? 0 : 1
+    const fs = props.isProjector ? 0 : 1
+    const disablekb = props.isProjector ? 1 : 0
+    const url = `https://www.youtube.com/embed/${props.slide.videoId}?autoplay=${autoplay}&mute=${mute}&controls=${controls}&modestbranding=1&color=white&rel=0&fs=${fs}&iv_load_policy=3&disablekb=${disablekb}&enablejsapi=1`
 
     console.log('YouTube URL generated:', url, 'isProjector:', props.isProjector)
     return url
@@ -330,5 +343,47 @@ watch(() => [props.slide, props.isProjector], ([newSlide, isProj]) => {
 </script>
 
 <style scoped>
-/* Custom slide styling */
+/* Fade transition */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.5s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.fade-enter-to,
+.fade-leave-from {
+  opacity: 1;
+}
+
+/* Slide transition */
+.slide-enter-active,
+.slide-leave-active {
+  transition: transform 0.5s ease, opacity 0.5s ease;
+}
+
+.slide-enter-from {
+  transform: translateX(100%);
+  opacity: 0;
+}
+
+.slide-leave-to {
+  transform: translateX(-100%);
+  opacity: 0;
+}
+
+.slide-enter-to,
+.slide-leave-from {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+/* None transition - instant */
+.none-enter-active,
+.none-leave-active {
+  transition: none;
+}
 </style>

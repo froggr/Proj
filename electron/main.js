@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen, dialog, Menu } = require('electron')
+const { app, BrowserWindow, ipcMain, screen, dialog, Menu, protocol } = require('electron')
 const path = require('path')
 const fs = require('fs')
 
@@ -11,6 +11,19 @@ app.commandLine.appendSwitch('--no-sandbox')
 app.commandLine.appendSwitch('--disable-setuid-sandbox')
 
 console.log('Using X11 mode with hardware acceleration enabled')
+
+// Register custom protocol as privileged (before app ready)
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'local-image',
+    privileges: {
+      secure: true,
+      supportFetchAPI: true,
+      bypassCSP: true,
+      stream: true
+    }
+  }
+])
 
 // Keep references to windows to prevent garbage collection
 let mainWindow = null
@@ -295,6 +308,26 @@ ipcMain.handle('select-images', async () => {
 
 // App lifecycle
 app.whenReady().then(() => {
+  // Register custom protocol for loading local images
+  protocol.registerFileProtocol('local-image', (request, callback) => {
+    // Remove 'local-image://' prefix and decode URI
+    const filePath = decodeURIComponent(request.url.replace('local-image://', ''))
+    console.log('Loading local image:', filePath)
+
+    try {
+      // Verify file exists before returning
+      if (fs.existsSync(filePath)) {
+        callback({ path: filePath })
+      } else {
+        console.error('Image file not found:', filePath)
+        callback({ error: -6 }) // FILE_NOT_FOUND
+      }
+    } catch (error) {
+      console.error('Error loading image:', error)
+      callback({ error: -2 }) // FAILED
+    }
+  })
+
   createMainWindow()
 
   app.on('activate', () => {

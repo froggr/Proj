@@ -57,17 +57,21 @@ let debounceTimer = null
 let autoAdvanceTimer = null
 
 // Debounced function to update projector
-function updateProjector(liveSlide) {
+function updateProjector(liveSlide, transitionType = 'none') {
   if (debounceTimer) {
     clearTimeout(debounceTimer)
   }
 
   debounceTimer = setTimeout(async () => {
     try {
-      const slideJson = JSON.stringify(liveSlide)
-      console.log('Control: Sending slide to projector:', slideJson)
+      const projectorData = {
+        slide: liveSlide,
+        transition: transitionType
+      }
+      const dataJson = JSON.stringify(projectorData)
+      console.log('Control: Sending to projector:', dataJson)
       if (window.electronAPI) {
-        await window.electronAPI.updateProjector(slideJson)
+        await window.electronAPI.updateProjector(dataJson)
         console.log('Control: Successfully sent to projector')
       }
     } catch (error) {
@@ -87,7 +91,12 @@ export function usePresentation() {
         ? stacks.value[newStackIndex]?.slides[newSlideIndex]
         : null
 
-      updateProjector(liveSlide)
+      // Get transition type from stack settings
+      const transitionType = newStackIndex !== null
+        ? stacks.value[newStackIndex]?.autoAdvance?.transition || 'none'
+        : 'none'
+
+      updateProjector(liveSlide, transitionType)
 
       // Handle auto-advance if enabled
       if (liveSlide && newStackIndex !== null) {

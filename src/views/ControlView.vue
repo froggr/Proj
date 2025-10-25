@@ -210,6 +210,7 @@
             <SlidePreview
               :slide="currentSlide"
               :isStaged="true"
+              :transitionType="currentStack?.autoAdvance?.transition || 'none'"
               @video-ended="onVideoComplete"
               @youtube-ended="onVideoComplete"
             />
@@ -231,6 +232,7 @@
           <SlidePreview
             :slide="liveSlide"
             :scale="0.2"
+            :transitionType="liveStack?.autoAdvance?.transition || 'none'"
             @video-ended="onVideoComplete"
             @youtube-ended="onVideoComplete"
           />

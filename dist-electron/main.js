@@ -1,5 +1,5 @@
 "use strict";
-const { app, BrowserWindow, ipcMain, screen, dialog, Menu } = require("electron");
+const { app, BrowserWindow, ipcMain, screen, dialog, Menu, protocol } = require("electron");
 const path = require("path");
 const fs = require("fs");
 console.log("Forcing X11/XWayland for Wayland compatibility");
@@ -7,6 +7,17 @@ app.commandLine.appendSwitch("--ozone-platform=x11");
 app.commandLine.appendSwitch("--no-sandbox");
 app.commandLine.appendSwitch("--disable-setuid-sandbox");
 console.log("Using X11 mode with hardware acceleration enabled");
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "local-image",
+    privileges: {
+      secure: true,
+      supportFetchAPI: true,
+      bypassCSP: true,
+      stream: true
+    }
+  }
+]);
 let mainWindow = null;
 let projectorWindow = null;
 const isDev = !app.isPackaged;
@@ -245,6 +256,21 @@ ipcMain.handle("select-images", async () => {
   }
 });
 app.whenReady().then(() => {
+  protocol.registerFileProtocol("local-image", (request, callback) => {
+    const filePath = decodeURIComponent(request.url.replace("local-image://", ""));
+    console.log("Loading local image:", filePath);
+    try {
+      if (fs.existsSync(filePath)) {
+        callback({ path: filePath });
+      } else {
+        console.error("Image file not found:", filePath);
+        callback({ error: -6 });
+      }
+    } catch (error) {
+      console.error("Error loading image:", error);
+      callback({ error: -2 });
+    }
+  });
   createMainWindow();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {

@@ -3,6 +3,7 @@
     <SlidePreview
       :slide="liveSlide"
       :is-projector="true"
+      :transitionType="transitionType"
       @video-ended="onVideoEnded"
       @youtube-ended="onYouTubeEnded"
     />
@@ -16,6 +17,7 @@ import SlidePreview from '../components/SlidePreview.vue'
 console.log('ProjectorView: Script loading')
 
 const liveSlide = ref(null)
+const transitionType = ref('none')
 
 // Watch for slide changes to debug
 watch(liveSlide, (newSlide) => {
@@ -33,11 +35,21 @@ onMounted(() => {
     window.electronAPI.onUpdateSlide((slideData) => {
       try {
         console.log('ProjectorView: Received slide data:', slideData)
-        const slide = typeof slideData === 'string' ? JSON.parse(slideData) : slideData
-        liveSlide.value = slide
+        const data = typeof slideData === 'string' ? JSON.parse(slideData) : slideData
+
+        // Handle both old format (just slide) and new format (slide + transition)
+        if (data && typeof data === 'object' && 'slide' in data) {
+          liveSlide.value = data.slide
+          transitionType.value = data.transition || 'none'
+        } else {
+          // Backward compatibility: treat as just a slide
+          liveSlide.value = data
+          transitionType.value = 'none'
+        }
       } catch (error) {
         console.error('ProjectorView: Failed to parse slide data:', error)
         liveSlide.value = null
+        transitionType.value = 'none'
       }
     })
     console.log('ProjectorView: Listener set up successfully')

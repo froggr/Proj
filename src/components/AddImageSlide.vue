@@ -58,7 +58,7 @@
         </label>
         <div class="bg-black rounded-lg overflow-hidden">
           <img
-            :src="imageUrl || `file://${selectedFile}`"
+            :src="imageUrl || `local-image://${selectedFile}`"
             class="w-full h-auto"
             @error="handleImageError"
           />
@@ -141,7 +141,7 @@ function addSlide() {
     selectedFiles.value.forEach((filePath, index) => {
       const slide = {
         type: 'image',
-        imageUrl: `file://${filePath}`,
+        imageUrl: `local-image://${filePath}`,
         title: title.value ? `${title.value} ${index + 1}` : `Image ${index + 1}`
       }
       emit('add', slide)
@@ -150,7 +150,7 @@ function addSlide() {
     // Single slide
     const slide = {
       type: 'image',
-      imageUrl: imageUrl.value || `file://${selectedFile.value}`,
+      imageUrl: imageUrl.value || `local-image://${selectedFile.value}`,
       title: title.value || 'Image Slide'
     }
     emit('add', slide)
