@@ -183,10 +183,29 @@ export function usePresentation() {
       // Go to next slide in stack (only update LIVE, not staged)
       liveSlideIndex.value++
       console.log('Auto-advanced to next slide (live only):', liveSlideIndex.value)
+      // Start auto-advance for the new slide
+      startAutoAdvance(liveStackIndex.value, liveSlideIndex.value)
     } else if (repeat) {
       // Loop back to first slide in stack (only update LIVE, not staged)
       console.log('At end of stack, looping back to first slide (live only)')
-      liveSlideIndex.value = 0
+
+      // If already at slide 0 (single-slide stack), force a reload by clearing and resetting
+      if (liveSlideIndex.value === 0) {
+        console.log('Single-slide stack: forcing reload')
+        // Temporarily clear to force Vue reactivity
+        const tempIndex = liveSlideIndex.value
+        liveSlideIndex.value = null
+        // Use nextTick to ensure the clearing is processed
+        setTimeout(() => {
+          liveSlideIndex.value = tempIndex
+          // Restart auto-advance
+          startAutoAdvance(liveStackIndex.value, liveSlideIndex.value)
+        }, 50)
+      } else {
+        liveSlideIndex.value = 0
+        // Start auto-advance for the first slide
+        startAutoAdvance(liveStackIndex.value, 0)
+      }
     } else {
       // End of stack, stop auto-advance
       console.log('At end of stack, repeat is false, stopping')

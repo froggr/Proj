@@ -1,19 +1,16 @@
 <template>
   <div class="w-full h-full bg-black flex items-center justify-center relative overflow-hidden">
     <div
-      :style="scale !== 1 ? {
+      :style="{
         position: 'absolute',
         width: '960px',
         height: '540px',
-        transform: `scale(${scale})`,
+        transform: scale !== 1 ? `scale(${scale})` : 'none',
         transformOrigin: 'center center',
         left: '50%',
         top: '50%',
         marginLeft: '-480px',
         marginTop: '-270px'
-      } : {
-        width: '100%',
-        height: '100%'
       }"
     >
       <Transition :name="transitionType" mode="out-in">
@@ -21,7 +18,7 @@
           v-if="!slide && !isProjector"
           :key="'no-slide'"
           class="text-gray-500 flex items-center justify-center h-full"
-          :style="{ fontSize: '2.5vh' }"
+          :style="{ fontSize: '14px' }"
         >
           No slide selected
         </div>
@@ -41,20 +38,20 @@
           class="w-full h-full flex items-center justify-center"
           :style="{
             backgroundColor: slide.background || '#1a1a1a',
-            padding: '8vh 10vw'
+            padding: '43px 96px'
           }"
         >
-          <div class="text-center" :style="{ maxWidth: '80vw' }">
+          <div class="text-center" :style="{ maxWidth: '768px' }">
             <div
               class="font-semibold text-gray-400"
-              :style="{ fontSize: '2.5vh', marginBottom: '4vh' }"
+              :style="{ fontSize: '14px', marginBottom: '22px' }"
             >
               {{ slide.reference }}
             </div>
             <div
               :style="{
                 fontFamily: slide.font || 'Inter',
-                fontSize: '4.2vh',
+                fontSize: '24px',
                 lineHeight: '1.6'
               }"
             >
@@ -62,7 +59,7 @@
             </div>
             <div
               class="text-gray-500"
-              :style="{ fontSize: '2vh', marginTop: '4vh' }"
+              :style="{ fontSize: '11px', marginTop: '22px' }"
             >
               {{ slide.translation }}
             </div>
@@ -117,8 +114,8 @@
           class="w-full h-full flex items-center justify-center custom-slide-container"
           :style="{
             backgroundColor: slide.background || '#1a1a1a',
-            padding: '8vh 10vw',
-            fontSize: '5vh'
+            padding: '43px 96px',
+            fontSize: '27px'
           }"
         >
           <div
@@ -137,6 +134,59 @@
           Unknown slide type: {{ slide.type }}
         </div>
       </Transition>
+    </div>
+
+    <!-- Video Controls (only show in control window for video/YouTube slides when staged) -->
+    <div
+      v-if="!isProjector && isStaged && (slide?.type === 'video' || slide?.type === 'youtube') && duration > 0"
+      class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-4 pt-8"
+    >
+      <div class="space-y-2">
+        <!-- Timeline -->
+        <div
+          @click="handleTimelineClick"
+          class="h-2 bg-neutral-700 rounded-full cursor-pointer hover:bg-neutral-600 transition-colors relative group"
+        >
+          <!-- Progress -->
+          <div
+            class="h-full bg-gold-500 rounded-full transition-all"
+            :style="{ width: `${(currentTime / duration) * 100}%` }"
+          ></div>
+          <!-- Hover indicator -->
+          <div
+            class="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-gold-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+            :style="{ left: `${(currentTime / duration) * 100}%`, marginLeft: '-6px' }"
+          ></div>
+        </div>
+
+        <!-- Controls Row -->
+        <div class="flex items-center justify-between text-white text-sm">
+          <div class="flex items-center gap-3">
+            <!-- Play/Pause Button -->
+            <button
+              @click="togglePlayPause"
+              class="w-8 h-8 flex items-center justify-center bg-gold-500 hover:bg-gold-600 rounded-full transition-colors"
+            >
+              <svg v-if="!isPlaying" class="w-4 h-4 text-black ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z"/>
+              </svg>
+              <svg v-else class="w-4 h-4 text-black" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+              </svg>
+            </button>
+
+            <!-- Time Display -->
+            <div class="text-neutral-300 font-mono text-xs">
+              {{ formatTime(currentTime) }} / {{ formatTime(duration) }}
+            </div>
+          </div>
+
+          <!-- Video Type Badge -->
+          <div class="text-xs text-neutral-400 uppercase tracking-wide">
+            {{ slide.type === 'youtube' ? 'YouTube' : 'Video' }}
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -173,6 +223,12 @@ const props = defineProps({
 
 const emit = defineEmits(['video-ended', 'youtube-ended'])
 
+// Video/YouTube playback control state
+const isPlaying = ref(false)
+const currentTime = ref(0)
+const duration = ref(0)
+const seeking = ref(false)
+
 const videoRef = ref(null)
 const youtubeVideoEnded = ref(false)
 const youtubeOverlayOpacity = ref(0)
@@ -202,12 +258,24 @@ async function resolveAssetUrl(assetUrl) {
 }
 
 // Watch for slide changes and resolve URLs
-watch(() => props.slide, async (newSlide) => {
+// Also watch libraryRoot so URLs are re-resolved when library opens
+watch([() => props.slide, () => props.libraryRoot], async ([newSlide, newLibraryRoot]) => {
+  console.log('SlidePreview: URL resolution watch triggered', {
+    slideType: newSlide?.type,
+    imageUrl: newSlide?.imageUrl,
+    videoUrl: newSlide?.videoUrl,
+    libraryRoot: newLibraryRoot
+  })
+
   if (newSlide?.type === 'image' && newSlide.imageUrl) {
-    resolvedImageUrl.value = await resolveAssetUrl(newSlide.imageUrl)
+    const resolved = await resolveAssetUrl(newSlide.imageUrl)
+    console.log('SlidePreview: Resolved image URL:', newSlide.imageUrl, '->', resolved)
+    resolvedImageUrl.value = resolved
   }
   if (newSlide?.type === 'video' && newSlide.videoUrl) {
-    resolvedVideoUrl.value = await resolveAssetUrl(newSlide.videoUrl)
+    const resolved = await resolveAssetUrl(newSlide.videoUrl)
+    console.log('SlidePreview: Resolved video URL:', newSlide.videoUrl, '->', resolved)
+    resolvedVideoUrl.value = resolved
   }
 }, { immediate: true })
 
@@ -242,7 +310,18 @@ const youtubeIframeRef = ref(null)
 
 // Handle video ended event
 function onVideoEnded() {
-  emit('video-ended')
+  console.log('Video ended - isProjector:', props.isProjector)
+
+  if (props.isProjector) {
+    // On projector: notify control window via IPC
+    if (window.electronAPI?.notifyVideoEnded) {
+      console.log('Projector: Notifying control window of video end')
+      window.electronAPI.notifyVideoEnded()
+    }
+  } else {
+    // On control window: emit local event for auto-advance
+    emit('video-ended')
+  }
 }
 
 // Watch for video element changes - trigger autoplay for projector
@@ -309,9 +388,27 @@ onMounted(() => {
           // Handle infoDelivery events (sends playerState inside info object)
           if (data.event === 'infoDelivery' && data.info && data.info.playerState !== undefined) {
             const playerState = data.info.playerState
-            const currentTime = data.info.currentTime
-            const duration = data.info.duration
+            const videoCurrentTime = data.info.currentTime
+            const videoDuration = data.info.duration
             const previousState = youtubePlayerState.value
+
+            // Update playback tracking state
+            if (videoDuration) {
+              duration.value = videoDuration
+            }
+            if (videoCurrentTime !== undefined) {
+              currentTime.value = videoCurrentTime
+            }
+            isPlaying.value = playerState == 1
+
+            // On projector: broadcast state to control window
+            if (props.isProjector && window.electronAPI?.notifyVideoState) {
+              window.electronAPI.notifyVideoState({
+                currentTime: videoCurrentTime,
+                duration: videoDuration,
+                isPlaying: playerState == 1
+              })
+            }
 
             // Only log state changes, not every update
             if (playerState !== previousState) {
@@ -346,13 +443,66 @@ onMounted(() => {
     }
 
     window.addEventListener('message', youtubeMessageListener)
+
+    // Set up IPC listeners based on window type
+    if (props.isProjector) {
+      // On projector: listen for video control commands from control window
+      if (window.electronAPI?.onVideoControl) {
+        window.electronAPI.onVideoControl((command, data) => {
+          console.log('Projector: Received video control command:', command, data)
+
+          if (command === 'toggle-play-pause') {
+            if (props.slide?.type === 'youtube' && youtubeIframeRef.value) {
+              const cmd = isPlaying.value ? 'pauseVideo' : 'playVideo'
+              youtubeIframeRef.value.contentWindow.postMessage(
+                `{"event":"command","func":"${cmd}","args":""}`,
+                '*'
+              )
+            } else if (props.slide?.type === 'video' && videoRef.value) {
+              if (isPlaying.value) {
+                videoRef.value.pause()
+              } else {
+                videoRef.value.play()
+              }
+            }
+          } else if (command === 'seek' && data?.time !== undefined) {
+            if (props.slide?.type === 'youtube' && youtubeIframeRef.value) {
+              youtubeIframeRef.value.contentWindow.postMessage(
+                `{"event":"command","func":"seekTo","args":[${data.time}, true]}`,
+                '*'
+              )
+            } else if (props.slide?.type === 'video' && videoRef.value) {
+              videoRef.value.currentTime = data.time
+            }
+          }
+        })
+      }
+    } else {
+      // On control: listen for video state updates from projector
+      if (window.electronAPI?.onVideoStateUpdate) {
+        window.electronAPI.onVideoStateUpdate((state) => {
+          currentTime.value = state.currentTime || 0
+          duration.value = state.duration || 0
+          isPlaying.value = state.isPlaying || false
+        })
+      }
+    }
   }
 })
 
-// Clean up event listener when component unmounts
+// Clean up event listeners when component unmounts
 onBeforeUnmount(() => {
   if (youtubeMessageListener && typeof window !== 'undefined') {
     window.removeEventListener('message', youtubeMessageListener)
+  }
+
+  // Clean up IPC listeners
+  if (window.electronAPI) {
+    if (props.isProjector && window.electronAPI.removeVideoControlListener) {
+      window.electronAPI.removeVideoControlListener()
+    } else if (!props.isProjector && window.electronAPI.removeVideoStateListener) {
+      window.electronAPI.removeVideoStateListener()
+    }
   }
 })
 
@@ -373,12 +523,125 @@ function handleVideoEnded() {
   }, 100)
 }
 
+// Video playback control functions
+function togglePlayPause() {
+  if (props.isProjector) {
+    // On projector: execute the command locally
+    if (props.slide?.type === 'youtube' && youtubeIframeRef.value) {
+      const command = isPlaying.value ? 'pauseVideo' : 'playVideo'
+      youtubeIframeRef.value.contentWindow.postMessage(
+        `{"event":"command","func":"${command}","args":""}`,
+        '*'
+      )
+    } else if (props.slide?.type === 'video' && videoRef.value) {
+      if (isPlaying.value) {
+        videoRef.value.pause()
+      } else {
+        videoRef.value.play()
+      }
+    }
+  } else {
+    // On control: send command to projector via IPC
+    if (window.electronAPI?.controlProjectorVideo) {
+      window.electronAPI.controlProjectorVideo('toggle-play-pause')
+    }
+  }
+}
+
+function seekTo(time) {
+  if (props.isProjector) {
+    // On projector: execute the seek locally
+    if (props.slide?.type === 'youtube' && youtubeIframeRef.value) {
+      youtubeIframeRef.value.contentWindow.postMessage(
+        `{"event":"command","func":"seekTo","args":[${time}, true]}`,
+        '*'
+      )
+    } else if (props.slide?.type === 'video' && videoRef.value) {
+      videoRef.value.currentTime = time
+    }
+  } else {
+    // On control: send command to projector via IPC
+    if (window.electronAPI?.controlProjectorVideo) {
+      window.electronAPI.controlProjectorVideo('seek', { time })
+    }
+  }
+}
+
+function handleTimelineClick(event) {
+  if (!duration.value) return
+
+  const rect = event.currentTarget.getBoundingClientRect()
+  const clickX = event.clientX - rect.left
+  const percent = clickX / rect.width
+  const newTime = percent * duration.value
+
+  seekTo(newTime)
+}
+
+function formatTime(seconds) {
+  if (!seconds || isNaN(seconds)) return '0:00'
+  const mins = Math.floor(seconds / 60)
+  const secs = Math.floor(seconds % 60)
+  return `${mins}:${secs.toString().padStart(2, '0')}`
+}
+
+// Track video playback state for regular videos
+watch(() => videoRef.value, (video) => {
+  if (!video) return
+
+  const updateTime = () => {
+    currentTime.value = video.currentTime
+    duration.value = video.duration || 0
+
+    // On projector: broadcast state to control window
+    if (props.isProjector && window.electronAPI?.notifyVideoState) {
+      window.electronAPI.notifyVideoState({
+        currentTime: video.currentTime,
+        duration: video.duration || 0,
+        isPlaying: !video.paused
+      })
+    }
+  }
+
+  const updatePlaying = () => {
+    isPlaying.value = !video.paused
+
+    // On projector: broadcast state to control window
+    if (props.isProjector && window.electronAPI?.notifyVideoState) {
+      window.electronAPI.notifyVideoState({
+        currentTime: video.currentTime,
+        duration: video.duration || 0,
+        isPlaying: !video.paused
+      })
+    }
+  }
+
+  video.addEventListener('timeupdate', updateTime)
+  video.addEventListener('durationchange', updateTime)
+  video.addEventListener('play', updatePlaying)
+  video.addEventListener('pause', updatePlaying)
+  video.addEventListener('loadedmetadata', updateTime)
+
+  return () => {
+    video.removeEventListener('timeupdate', updateTime)
+    video.removeEventListener('durationchange', updateTime)
+    video.removeEventListener('play', updatePlaying)
+    video.removeEventListener('pause', updatePlaying)
+    video.removeEventListener('loadedmetadata', updateTime)
+  }
+})
+
 // Watch for YouTube videos on projector to unmute after autoplay starts
 watch(() => [props.slide, props.isProjector], ([newSlide, isProj]) => {
   // Reset overlay state when slide changes
   youtubeVideoEnded.value = false
   youtubeOverlayOpacity.value = 0
   youtubePlayerState.value = null  // IMPORTANT: Reset state tracking for new video
+
+  // Reset playback state
+  isPlaying.value = false
+  currentTime.value = 0
+  duration.value = 0
 
   if (newSlide?.type === 'youtube') {
     // Give iframe time to load
@@ -389,6 +652,12 @@ watch(() => [props.slide, props.isProjector], ([newSlide, isProj]) => {
         // Tell YouTube to start sending us events
         youtubeIframeRef.value.contentWindow.postMessage(
           '{"event":"listening","id":"' + newSlide.videoId + '"}',
+          '*'
+        )
+
+        // Request periodic updates for playback tracking
+        youtubeIframeRef.value.contentWindow.postMessage(
+          '{"event":"command","func":"getVideoUrl","args":""}',
           '*'
         )
 

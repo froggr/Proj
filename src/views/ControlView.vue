@@ -1211,18 +1211,32 @@ async function handleCreateLibrary({ name, path }) {
 }
 
 async function handleOpenLibrary(libPath, metadata) {
-  // Library is already opened in the dialog
-  console.log('Library opened:', metadata.name)
+  console.log('handleOpenLibrary called with path:', libPath)
+  // Actually open the library in the composable
+  const result = await openLibrary(libPath)
+  if (result.success) {
+    console.log('Library opened successfully:', metadata.name)
+  } else {
+    console.error('Failed to open library:', result.error)
+    alert(`Failed to open library: ${result.error}`)
+  }
 }
 
 async function handleOpenEvent(eventName) {
+  console.log('handleOpenEvent called with:', eventName, 'Library open:', isLibraryOpen.value, 'libraryRoot:', libraryRoot.value)
+
   const result = await loadEvent(eventName)
   if (result.success) {
     // Clear projection before loading new event
     clearProjection()
     loadPresentationData(JSON.stringify(result.data))
-    console.log('Event loaded:', eventName)
+    console.log('Event loaded successfully:', eventName)
+
+    // Close the event selector dialog
+    showSelectEventDialog.value = false
+    showOpenLibraryDialog.value = false
   } else {
+    console.error('Failed to load event:', result.error)
     alert(`Failed to load event: ${result.error}`)
   }
 }
@@ -1453,9 +1467,18 @@ onMounted(async () => {
   if (lastLibraryPath) {
     console.log('Auto-opening last library:', lastLibraryPath)
     const result = await openLibrary(lastLibraryPath)
-    if (!result.success) {
+    if (result.success) {
+      console.log('Library auto-opened successfully, showing event selector')
+      // Show event selector after library opens
+      showSelectEventDialog.value = true
+    } else {
       console.warn('Failed to auto-open last library:', result.error)
-      // Don't show error to user - they can manually open/create a library
+      // Clear invalid path from localStorage
+      try {
+        localStorage.removeItem('dc_lastLibraryPath')
+      } catch (e) {
+        console.warn('Failed to clear invalid library path:', e)
+      }
     }
   }
 

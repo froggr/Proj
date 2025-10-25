@@ -25,6 +25,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onVideoEnded: (callback) => {
     ipcRenderer.on('video-ended-notification', callback)
   },
+  removeVideoEndedListener: () => {
+    ipcRenderer.removeAllListeners('video-ended-notification')
+  },
+
+  // Video playback control (control -> projector)
+  controlProjectorVideo: (command, data) => ipcRenderer.send('control-projector-video', command, data),
+  onVideoControl: (callback) => {
+    ipcRenderer.on('video-control-command', (event, command, data) => callback(command, data))
+  },
+  removeVideoControlListener: () => {
+    ipcRenderer.removeAllListeners('video-control-command')
+  },
+
+  // Video playback state (projector -> control)
+  notifyVideoState: (state) => ipcRenderer.send('video-state-update', state),
+  onVideoStateUpdate: (callback) => {
+    ipcRenderer.on('video-state-notification', (event, state) => callback(state))
+  },
+  removeVideoStateListener: () => {
+    ipcRenderer.removeAllListeners('video-state-notification')
+  },
 
   // File operations
   savePresentation: (data) => ipcRenderer.invoke('save-presentation', data),

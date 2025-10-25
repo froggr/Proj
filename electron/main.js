@@ -259,6 +259,21 @@ ipcMain.on('video-ended', () => {
   }
 })
 
+// Video playback control from control window to projector
+ipcMain.on('control-projector-video', (event, command, data) => {
+  console.log('Main: Video control command from control window:', command, data)
+  if (projectorWindow && !projectorWindow.isDestroyed()) {
+    projectorWindow.webContents.send('video-control-command', command, data)
+  }
+})
+
+// Video playback state updates from projector to control window
+ipcMain.on('video-state-update', (event, state) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('video-state-notification', state)
+  }
+})
+
 // Window control handlers
 ipcMain.handle('window-minimize', () => {
   if (mainWindow && !mainWindow.isDestroyed()) {
