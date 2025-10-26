@@ -8,16 +8,16 @@ export default {
     extend: {
       colors: {
         gold: {
-          50: '#fefce8',
-          100: '#fef9c3',
-          200: '#fef08a',
-          300: '#fde047',
-          400: '#FFD700', // Bright gold
-          500: '#FFD700', // Bright gold
-          600: '#D4AF37', // Classic gold
-          700: '#B8960A',
-          800: '#9A7D0A',
-          900: '#7D6608',
+          50: '#fdf4ec',
+          100: '#fbe8d8',
+          200: '#f7d1b1',
+          300: '#f0ab73',
+          400: '#e49255',
+          500: '#D87E38', // Brand orange-gold from logo
+          600: '#c26d28',
+          700: '#a15a20',
+          800: '#82491e',
+          900: '#6a3d1d',
         }
       }
     },

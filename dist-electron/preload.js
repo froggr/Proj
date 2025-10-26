@@ -59,5 +59,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   selectLibraryFolder: () => ipcRenderer.invoke("select-library-folder"),
   // Asset management
   listLibraryAssets: (libPath) => ipcRenderer.invoke("list-library-assets", libPath),
-  importAssetsToLibrary: (libPath, assetType) => ipcRenderer.invoke("import-assets-to-library", libPath, assetType)
+  importAssetsToLibrary: (libPath, assetType) => ipcRenderer.invoke("import-assets-to-library", libPath, assetType),
+  checkAssetUsage: (libPath, assetUrl) => ipcRenderer.invoke("check-asset-usage", libPath, assetUrl),
+  deleteLibraryAsset: (libPath, assetPath) => ipcRenderer.invoke("delete-library-asset", libPath, assetPath)
 });

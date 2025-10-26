@@ -4,12 +4,11 @@
   "private": true,
   "main": "electron/main.js",
   "scripts": {
-    "dev": "vite",
+    "dev": "node dev-separate.js",
     "build": "vite build && electron-builder",
     "preview": "vite preview",
     "test-electron": "electron --no-sandbox --disable-setuid-sandbox electron-test.js",
-    "electron-direct": "electron --no-sandbox --disable-setuid-sandbox electron/main.js",
-    "dev:separate": "node dev-separate.js"
+    "electron-direct": "electron --no-sandbox --disable-setuid-sandbox electron/main.js"
   },
   "build": {
     "appId": "com.donglecontrol.projector",

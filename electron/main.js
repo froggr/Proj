@@ -669,6 +669,73 @@ ipcMain.handle('import-assets-to-library', async (event, libPath, assetType) => 
   }
 })
 
+// Check which events use a specific asset
+ipcMain.handle('check-asset-usage', async (event, libPath, assetUrl) => {
+  try {
+    if (!libPath || !assetUrl) {
+      return []
+    }
+
+    const eventsDir = path.join(libPath, 'events')
+    if (!fs.existsSync(eventsDir)) {
+      return []
+    }
+
+    const eventFiles = fs.readdirSync(eventsDir).filter(f => f.endsWith('.json'))
+    const usageList = []
+
+    // Search each event file for the asset URL
+    for (const eventFile of eventFiles) {
+      const eventPath = path.join(eventsDir, eventFile)
+      try {
+        const content = fs.readFileSync(eventPath, 'utf-8')
+
+        // Simple string search - if the asset URL appears anywhere in the file, it's in use
+        if (content.includes(assetUrl)) {
+          // Get the event name (remove .json extension)
+          const eventName = eventFile.replace('.json', '')
+          usageList.push(eventName)
+        }
+      } catch (error) {
+        console.error(`Error reading event file ${eventFile}:`, error)
+      }
+    }
+
+    return usageList
+  } catch (error) {
+    console.error('Check asset usage failed:', error)
+    return []
+  }
+})
+
+// Delete an asset file from the library
+ipcMain.handle('delete-library-asset', async (event, libPath, assetPath) => {
+  try {
+    if (!libPath || !assetPath) {
+      return { success: false, error: 'Invalid parameters' }
+    }
+
+    // Verify the asset path is within the library
+    if (!assetPath.startsWith(libPath)) {
+      return { success: false, error: 'Asset path is not within library' }
+    }
+
+    // Verify file exists
+    if (!fs.existsSync(assetPath)) {
+      return { success: false, error: 'Asset file not found' }
+    }
+
+    // Delete the file
+    fs.unlinkSync(assetPath)
+    console.log('Asset deleted:', assetPath)
+
+    return { success: true }
+  } catch (error) {
+    console.error('Delete asset failed:', error)
+    return { success: false, error: error.message }
+  }
+})
+
 // App lifecycle
 app.whenReady().then(() => {
   // Register custom protocol for loading local images and videos

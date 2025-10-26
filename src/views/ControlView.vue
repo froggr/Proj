@@ -59,7 +59,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
               </svg>
             </button>
-            <div v-if="showFileMenu" class="absolute top-full left-0 mt-1 bg-neutral-800 border border-neutral-700 rounded-lg shadow-xl py-1 min-w-[140px] z-[200]">
+            <div v-if="showFileMenu" class="absolute top-full left-0 mt-1 bg-neutral-800 border border-neutral-700 rounded-lg shadow-xl py-1 min-w-[160px] z-[200]">
               <button
                 @click="showNewLibraryDialog = true; showFileMenu = false"
                 class="w-full px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-700 hover:text-gold-500 transition-all text-left"
@@ -71,6 +71,13 @@
                 class="w-full px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-700 hover:text-gold-500 transition-all text-left"
               >
                 Open Library...
+              </button>
+              <button
+                v-if="isLibraryOpen"
+                @click="showLibraryManager = true; showFileMenu = false"
+                class="w-full px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-700 hover:text-gold-500 transition-all text-left"
+              >
+                Library Manager...
               </button>
               <div v-if="isLibraryOpen" class="border-t border-neutral-700 my-1"></div>
               <button
@@ -774,6 +781,12 @@
       @close="showNewEventDialog = false"
       @create="handleCreateNewEvent"
     />
+    <LibraryManager
+      :show="showLibraryManager"
+      :library-root="libraryRoot"
+      @close="showLibraryManager = false"
+      @asset-deleted="handleAssetDeleted"
+    />
   </div>
 </template>
 
@@ -789,6 +802,7 @@ import CustomSlideEditor from '../components/CustomSlideEditor.vue'
 import AddBibleSlide from '../components/AddBibleSlide.vue'
 import AddYouTubeSlide from '../components/AddYouTubeSlide.vue'
 import AssetPicker from '../components/AssetPicker.vue'
+import LibraryManager from '../components/LibraryManager.vue'
 import InputDialog from '../components/InputDialog.vue'
 import NewLibraryDialog from '../components/NewLibraryDialog.vue'
 import OpenLibraryDialog from '../components/OpenLibraryDialog.vue'
@@ -864,6 +878,7 @@ const showNewLibraryDialog = ref(false)
 const showOpenLibraryDialog = ref(false)
 const showSelectEventDialog = ref(false)
 const showNewEventDialog = ref(false)
+const showLibraryManager = ref(false)
 const showFileMenu = ref(false)
 const showDisplaySettings = ref(false)
 const saveStatus = ref('') // 'saving', 'saved', ''
@@ -1337,6 +1352,15 @@ async function handleDeleteEvent(eventName) {
   } else {
     alert(`Failed to delete event: ${result.error}`)
   }
+}
+
+function handleAssetDeleted(asset) {
+  console.log('Asset deleted:', asset.filename)
+  // The LibraryManager already deleted the file
+  // We don't need to do anything here, but we could:
+  // - Show a notification
+  // - Refresh any asset lists
+  // - Check if current event uses the asset and warn user
 }
 
 function handleCloseLibrary() {
