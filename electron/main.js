@@ -52,7 +52,9 @@ function createMainWindow() {
       devTools: true,
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
-      contextIsolation: true
+      contextIsolation: true,
+      webSecurity: false,
+      allowRunningInsecureContent: true
     },
     title: 'DongleControl Projector'
   })
@@ -141,7 +143,9 @@ function createProjectorWindow(monitorIndex = null) {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
+      preload: path.join(__dirname, 'preload.js'),
+      webSecurity: false,
+      allowRunningInsecureContent: true
     },
     title: 'DongleControl Projector - Drag me to display, then press F11'
   })
@@ -483,6 +487,21 @@ ipcMain.handle('delete-library-event', async (event, libPath, eventName) => {
 
 ipcMain.handle('resolve-asset-path', async (event, libPath, assetUrl) => {
   try {
+    // Handle existing local-image:// URLs (for backward compatibility)
+    if (assetUrl.startsWith('local-image://')) {
+      return assetUrl
+    }
+    
+    // Handle file:// URLs (convert to local-image://)
+    if (assetUrl.startsWith('file://')) {
+      let filePath = assetUrl.replace('file://', '')
+      // On Windows, file:// URLs might have an extra slash
+      if (process.platform === 'win32' && filePath.startsWith('/')) {
+        filePath = filePath.substring(1)
+      }
+      return `local-image://${filePath}`
+    }
+    
     if (!assetUrl.startsWith('assets://')) {
       return assetUrl
     }
@@ -493,8 +512,10 @@ ipcMain.handle('resolve-asset-path', async (event, libPath, assetUrl) => {
 
     // Check if exists
     if (fs.existsSync(fullPath)) {
-      // Return local-image:// URL so browser can load it
-      return `local-image://${fullPath}`
+      // On Windows, ensure we use forward slashes in the URL
+      // The protocol handler will convert them back as needed
+      const urlPath = process.platform === 'win32' ? fullPath.replace(/\\/g, '/') : fullPath
+      return `local-image://${urlPath}`
     }
 
     // Check in trash
@@ -736,16 +757,53 @@ ipcMain.handle('delete-library-asset', async (event, libPath, assetPath) => {
   }
 })
 
+// Helper to send logs to renderer
+function sendLogToRenderer(message) {
+  if (mainWindow && mainWindow.webContents) {
+    mainWindow.webContents.send('main-process-log', message)
+  }
+}
+
 // App lifecycle
 app.whenReady().then(() => {
   // Register custom protocol for loading local images and videos
   protocol.registerFileProtocol('local-image', (request, callback) => {
-    // Remove 'local-image://' prefix and decode URI
-    const filePath = decodeURIComponent(request.url.replace('local-image://', ''))
+    const logMsg = `local-image protocol request: ${request.url}`
+    console.log(logMsg)
+    sendLogToRenderer(logMsg)
+    
+    // Parse the URL properly to handle Windows paths
+    let filePath = decodeURIComponent(request.url.replace('local-image://', ''))
+    sendLogToRenderer(`After removing protocol: ${filePath}`)
+    
+    // On Windows, the path might start with a slash before the drive letter
+    // e.g., "/C:/Users/..." should become "C:/Users/..."
+    if (process.platform === 'win32' && filePath.match(/^\/[A-Za-z]:/)) {
+      filePath = filePath.substring(1)
+      sendLogToRenderer(`After removing leading slash: ${filePath}`)
+    }
+    
+    // Convert forward slashes to backslashes on Windows for fs operations
+    if (process.platform === 'win32') {
+      // Simply replace forward slashes with backslashes
+      // The colon should already be there from the original URL
+      filePath = filePath.replace(/\//g, '\\')
+      sendLogToRenderer(`After converting slashes: ${filePath}`)
+      
+      // Debug: Let's check if the colon is missing
+      if (!filePath.match(/^[A-Za-z]:\\/)) {
+        sendLogToRenderer(`WARNING: Path missing colon after drive letter: ${filePath}`)
+        // Try to fix it if it's missing
+        filePath = filePath.replace(/^([A-Za-z])\\/, '$1:\\')
+        sendLogToRenderer(`Fixed path: ${filePath}`)
+      }
+    }
 
     try {
       // Verify file exists before returning
+      sendLogToRenderer(`Checking if file exists: ${filePath}`)
       if (fs.existsSync(filePath)) {
+        sendLogToRenderer(`File exists! Returning path: ${filePath}`)
         // Get file stats for caching headers
         const stats = fs.statSync(filePath)
 
@@ -778,11 +836,22 @@ app.whenReady().then(() => {
             }
           })
         } else {
+          // For Windows, we need to ensure the path is properly formatted
+          // Just return the path - Electron will handle the file serving
+          console.log('Returning path to callback:', filePath)
           callback({ path: filePath })
         }
       } else {
         console.error('Asset file not found:', filePath)
-        callback({ error: -6 }) // FILE_NOT_FOUND
+        // Try with original path format as fallback
+        const originalPath = decodeURIComponent(request.url.replace('local-image://', ''))
+        console.log('Trying original path:', originalPath)
+        if (fs.existsSync(originalPath)) {
+          console.log('Original path exists!')
+          callback({ path: originalPath })
+        } else {
+          callback({ error: -6 }) // FILE_NOT_FOUND
+        }
       }
     } catch (error) {
       console.error('Error loading asset:', filePath, error)

@@ -286,40 +286,51 @@ const resolvedVideoUrl = ref(null)
 const videoRetryCount = ref(0)
 const videoRetryTimer = ref(null)
 
-// Resolve assets:// URLs to local-image:// URLs
+// Resolve various URL formats to local-image:// URLs
 async function resolveAssetUrl(assetUrl) {
-  if (!assetUrl || !assetUrl.startsWith('assets://')) {
+  if (!assetUrl) {
     return assetUrl
   }
 
-  if (!props.libraryRoot || !window.electronAPI) {
-    console.warn('SlidePreview: Cannot resolve asset URL - library not open or Electron API not available', {
-      assetUrl,
-      hasLibraryRoot: !!props.libraryRoot,
-      hasElectronAPI: !!window.electronAPI
-    })
+  // Already a local-image:// URL, return as-is
+  if (assetUrl.startsWith('local-image://')) {
     return assetUrl
   }
 
-  // Check cache first
-  const cacheKey = `${props.libraryRoot}::${assetUrl}`
-  if (assetUrlCache.has(cacheKey)) {
-    return assetUrlCache.get(cacheKey)
+  // Handle file:// URLs or assets:// URLs that need resolving
+  if (assetUrl.startsWith('assets://') || assetUrl.startsWith('file://')) {
+    if (!props.libraryRoot || !window.electronAPI) {
+      console.warn('SlidePreview: Cannot resolve asset URL - library not open or Electron API not available', {
+        assetUrl,
+        hasLibraryRoot: !!props.libraryRoot,
+        hasElectronAPI: !!window.electronAPI
+      })
+      return assetUrl
+    }
+
+    // Check cache first
+    const cacheKey = `${props.libraryRoot}::${assetUrl}`
+    if (assetUrlCache.has(cacheKey)) {
+      return assetUrlCache.get(cacheKey)
+    }
+
+    try {
+      // resolveAssetPath now handles both assets:// and file:// URLs
+      const resolvedUrl = await window.electronAPI.resolveAssetPath(props.libraryRoot, assetUrl)
+      const finalUrl = resolvedUrl || assetUrl
+
+      // Cache the result
+      assetUrlCache.set(cacheKey, finalUrl)
+
+      return finalUrl
+    } catch (error) {
+      console.error('Failed to resolve asset URL:', assetUrl, error)
+      return assetUrl
+    }
   }
 
-  try {
-    // resolveAssetPath now returns local-image:// URLs directly
-    const resolvedUrl = await window.electronAPI.resolveAssetPath(props.libraryRoot, assetUrl)
-    const finalUrl = resolvedUrl || assetUrl
-
-    // Cache the result
-    assetUrlCache.set(cacheKey, finalUrl)
-
-    return finalUrl
-  } catch (error) {
-    console.error('Failed to resolve asset URL:', assetUrl, error)
-    return assetUrl
-  }
+  // Return other URLs unchanged (http://, https://, etc.)
+  return assetUrl
 }
 
 // Retry loading video on error (workaround for problematic video files)
@@ -382,17 +393,17 @@ const youtubeUrl = computed(() => {
     const mute = 1
 
     // Build URL with parameters to configure YouTube UI
-    // modestbranding=1: minimal YouTube branding
-    // color=white: white progress bar (cleaner)
     // rel=0: show related videos from same channel only
     // fs=0: disable fullscreen button on projector (controlled from control window)
     // iv_load_policy=3: hide video annotations
     // controls: show on control window, hide on projector for minimal UI
     // disablekb=1: disable keyboard controls on projector
+    // origin: required for proper CORS handling
     const controls = props.isProjector ? 0 : 1
     const fs = props.isProjector ? 0 : 1
     const disablekb = props.isProjector ? 1 : 0
-    const url = `https://www.youtube.com/embed/${props.slide.videoId}?autoplay=${autoplay}&mute=${mute}&controls=${controls}&modestbranding=1&color=white&rel=0&fs=${fs}&iv_load_policy=3&disablekb=${disablekb}&enablejsapi=1`
+    const origin = window.location.origin || 'http://localhost'
+    const url = `https://www.youtube-nocookie.com/embed/${props.slide.videoId}?autoplay=${autoplay}&mute=${mute}&controls=${controls}&rel=0&fs=${fs}&iv_load_policy=3&disablekb=${disablekb}&enablejsapi=1&origin=${encodeURIComponent(origin)}`
 
     console.log('YouTube URL generated:', url, 'isProjector:', props.isProjector)
     return url

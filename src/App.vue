@@ -18,5 +18,12 @@ onMounted(() => {
   ) {
     currentView.value = ProjectorView
   }
+
+  // Listen for main process logs
+  if (window.electronAPI?.onMainProcessLog) {
+    window.electronAPI.onMainProcessLog((message) => {
+      // Logs will automatically appear in console via preload
+    })
+  }
 })
 </script>

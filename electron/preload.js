@@ -29,6 +29,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeAllListeners('video-ended-notification')
   },
 
+  // Main process logging
+  onMainProcessLog: (callback) => {
+    ipcRenderer.on('main-process-log', (event, message) => {
+      console.log('[Main Process]:', message)
+      callback(message)
+    })
+  },
+
   // Video playback control (control -> projector)
   controlProjectorVideo: (command, data) => ipcRenderer.send('control-projector-video', command, data),
   onVideoControl: (callback) => {

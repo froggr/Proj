@@ -65,23 +65,34 @@ defineEmits(['click'])
 
 const resolvedImageUrl = ref(null)
 
-// Resolve assets:// URLs to local-image:// URLs
+// Resolve various URL formats to local-image:// URLs
 async function resolveAssetUrl(assetUrl) {
-  if (!assetUrl || !assetUrl.startsWith('assets://')) {
+  if (!assetUrl) {
     return assetUrl
   }
 
-  if (!props.libraryRoot || !window.electronAPI) {
+  // Already a local-image:// URL, return as-is
+  if (assetUrl.startsWith('local-image://')) {
     return assetUrl
   }
 
-  try {
-    const resolvedUrl = await window.electronAPI.resolveAssetPath(props.libraryRoot, assetUrl)
-    return resolvedUrl || assetUrl
-  } catch (error) {
-    console.error('Failed to resolve asset URL:', error)
-    return assetUrl
+  // Handle file:// URLs or assets:// URLs that need resolving
+  if (assetUrl.startsWith('assets://') || assetUrl.startsWith('file://')) {
+    if (!props.libraryRoot || !window.electronAPI) {
+      return assetUrl
+    }
+
+    try {
+      const resolvedUrl = await window.electronAPI.resolveAssetPath(props.libraryRoot, assetUrl)
+      return resolvedUrl || assetUrl
+    } catch (error) {
+      console.error('Failed to resolve asset URL:', error)
+      return assetUrl
+    }
   }
+
+  // Return other URLs unchanged
+  return assetUrl
 }
 
 // Watch for slide changes and resolve URLs
