@@ -448,7 +448,6 @@
         <div class="aspect-video bg-black rounded border border-neutral-700 overflow-hidden">
           <SlidePreview
             :slide="liveSlide"
-            :scale="0.2"
             :library-root="libraryRoot"
             :text-scale="textScale"
             :transitionType="liveStack?.autoAdvance?.transition || 'none'"
@@ -490,7 +489,7 @@
               ]"
             >
               <div class="w-full h-full bg-black relative">
-                <SlidePreview :slide="slide" :scale="0.1" :library-root="libraryRoot" :text-scale="textScale" />
+                <SlidePreview :slide="slide" :library-root="libraryRoot" :text-scale="textScale" />
                 <div class="absolute bottom-0.5 left-0.5 px-1 py-0.5 bg-black/80 text-[9px] text-neutral-400 font-medium rounded">
                   {{ index + 1 }}
                 </div>
@@ -835,7 +834,8 @@ const {
   onVideoComplete,
   savePresentation: savePresentationData,
   loadPresentation: loadPresentationData,
-  setLibraryRoot
+  setLibraryRoot,
+  textScale
 } = usePresentation()
 
 const {
@@ -862,7 +862,6 @@ const {
 } = useLibrary()
 
 const aspectRatio = ref('16:9-1080')
-const textScale = ref(100) // 100 = 100% = 1.0x
 const expandedStacks = reactive({})
 const showCustomDialog = ref(false)
 const showBibleDialog = ref(false)

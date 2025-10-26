@@ -42,6 +42,7 @@ export default defineConfig({
   server: {
     port: 5173, // Standard Vite port
   },
+  base: './', // Critical: Use relative paths for Electron production
   build: {
     target: 'esnext',
     outDir: 'dist',

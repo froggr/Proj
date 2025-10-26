@@ -11,7 +11,11 @@ const currentView = ref(ControlView)
 
 onMounted(() => {
   const params = new URLSearchParams(window.location.search)
-  if (params.get('view') === 'projector' || window.location.pathname.includes('/projector')) {
+  if (
+    params.get('view') === 'projector' ||
+    window.location.pathname.includes('/projector') ||
+    window.location.hash.includes('projector')
+  ) {
     currentView.value = ProjectorView
   }
 })

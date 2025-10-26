@@ -1,16 +1,16 @@
 <template>
   <div class="w-full h-full bg-black flex items-center justify-center relative overflow-hidden">
     <div
+      class="slide-container"
       :style="{
-        position: 'absolute',
-        width: '960px',
-        height: '540px',
-        transform: scale !== 1 ? `scale(${scale})` : 'none',
-        transformOrigin: 'center center',
-        left: '50%',
-        top: '50%',
-        marginLeft: '-480px',
-        marginTop: '-270px'
+        width: '100%',
+        height: '100%',
+        maxWidth: '100%',
+        maxHeight: '100%',
+        aspectRatio: aspectRatioValue,
+        margin: 'auto',
+        position: 'relative',
+        containerType: 'size'
       }"
     >
       <Transition :name="transitionType" mode="out-in">
@@ -39,10 +39,10 @@
           class="w-full h-full flex items-center justify-center"
           :style="{
             backgroundColor: slide.background || '#1a1a1a',
-            padding: '43px 96px'
+            padding: '4.5% 10%'
           }"
         >
-          <div class="text-center" :style="{ maxWidth: '768px' }">
+          <div class="text-center">
             <div
               class="font-semibold text-gray-400"
               :style="{ fontSize: scaledFontSizes.bibleReference, marginBottom: '22px' }"
@@ -141,7 +141,7 @@
           class="w-full h-full flex items-center justify-center custom-slide-container"
           :style="{
             backgroundColor: slide.background || '#1a1a1a',
-            padding: '43px 96px',
+            padding: '4.5% 10%',
             fontSize: scaledFontSizes.customText
           }"
         >
@@ -233,10 +233,6 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
-  scale: {
-    type: Number,
-    default: 1
-  },
   isStaged: {
     type: Boolean,
     default: false
@@ -257,14 +253,21 @@ const props = defineProps({
 
 const emit = defineEmits(['video-ended', 'youtube-ended'])
 
+// Aspect ratio for content (16:9 standard)
+const aspectRatioValue = computed(() => '16 / 9')
+
 // Compute scaled font sizes based on textScale prop
+// Using cqw (container query width) units for responsive scaling
+// Container is 16:9, so width-based sizing works perfectly
 const scaledFontSizes = computed(() => {
   const multiplier = props.textScale / 100
+  // Convert from px to cqw: (px / 960) * 100 * multiplier
+  // These scale with the container width, not the viewport
   return {
-    bibleReference: Math.round(14 * multiplier) + 'px',
-    bibleText: Math.round(24 * multiplier) + 'px',
-    bibleTranslation: Math.round(11 * multiplier) + 'px',
-    customText: Math.round(27 * multiplier) + 'px'
+    bibleReference: (1.46 * multiplier).toFixed(2) + 'cqw',  // 14px @ 960px container width
+    bibleText: (2.5 * multiplier).toFixed(2) + 'cqw',        // 24px @ 960px container width
+    bibleTranslation: (1.15 * multiplier).toFixed(2) + 'cqw', // 11px @ 960px container width
+    customText: (2.81 * multiplier).toFixed(2) + 'cqw'       // 27px @ 960px container width
   }
 })
 
@@ -321,8 +324,8 @@ async function resolveAssetUrl(assetUrl) {
 
 // Retry loading video on error (workaround for problematic video files)
 function retryVideoLoad() {
-  const MAX_RETRIES = 3
-  const RETRY_DELAY = 500 // ms
+  const MAX_RETRIES = 2 // Reduced from 3 - should work faster with caching
+  const RETRY_DELAY = 800 // Increased from 500ms - give browser cache time
 
   if (videoRetryCount.value >= MAX_RETRIES) {
     console.error('Video failed to load after', MAX_RETRIES, 'retries')
@@ -344,7 +347,7 @@ function retryVideoLoad() {
 
     setTimeout(() => {
       resolvedVideoUrl.value = currentUrl
-    }, 50)
+    }, 100) // Increased from 50ms
   }, RETRY_DELAY)
 }
 

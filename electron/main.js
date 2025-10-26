@@ -746,6 +746,9 @@ app.whenReady().then(() => {
     try {
       // Verify file exists before returning
       if (fs.existsSync(filePath)) {
+        // Get file stats for caching headers
+        const stats = fs.statSync(filePath)
+
         // Determine MIME type from extension
         const ext = path.extname(filePath).toLowerCase()
         const mimeTypes = {
@@ -766,7 +769,12 @@ app.whenReady().then(() => {
             path: filePath,
             headers: {
               'Content-Type': mimeType,
-              'Accept-Ranges': 'bytes'
+              'Accept-Ranges': 'bytes',
+              // Enable aggressive browser caching - cache for 1 year
+              'Cache-Control': 'public, max-age=31536000, immutable',
+              // Use file modification time as ETag for cache validation
+              'ETag': `"${stats.mtime.getTime()}-${stats.size}"`,
+              'Last-Modified': stats.mtime.toUTCString()
             }
           })
         } else {

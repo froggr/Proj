@@ -2,30 +2,53 @@
   "name": "donglecontrol-projector",
   "version": "0.1.0",
   "private": true,
-  "main": "electron/main.js",
+  "main": "dist-electron/main.js",
   "scripts": {
     "dev": "node dev-separate.js",
     "build": "vite build && electron-builder",
+    "build:linux": "vite build && electron-builder --linux",
+    "build:mac": "vite build && electron-builder --mac",
+    "build:win": "vite build && electron-builder --win",
+    "build:all": "vite build && electron-builder -mwl",
     "preview": "vite preview",
     "test-electron": "electron --no-sandbox --disable-setuid-sandbox electron-test.js",
     "electron-direct": "electron --no-sandbox --disable-setuid-sandbox electron/main.js"
   },
   "build": {
     "appId": "com.donglecontrol.projector",
-    "productName": "DongleControl Projector",
+    "productName": "DCProjector",
     "directories": {
       "output": "release"
     },
     "files": [
       "dist/**/*",
-      "electron/**/*"
+      "dist-electron/**/*"
     ],
+    "afterPack": "./build-hooks.js",
     "linux": {
-      "target": [
-        "AppImage",
-        "deb"
-      ],
+      "target": "AppImage",
       "category": "AudioVideo"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.icns"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     }
   },
   "dependencies": {

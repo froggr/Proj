@@ -32,6 +32,9 @@ const liveSlideIndex = ref(null)
 // Library root for resolving asset URLs
 const libraryRoot = ref(null)
 
+// Text scale for projector (shared state)
+const textScale = ref(100)
+
 let watchInitialized = false
 let debounceTimer = null
 let autoAdvanceTimer = null
@@ -47,7 +50,8 @@ function updateProjector(liveSlide, transitionType = 'none') {
       const projectorData = {
         slide: liveSlide,
         transition: transitionType,
-        libraryRoot: libraryRoot.value
+        libraryRoot: libraryRoot.value,
+        textScale: textScale.value
       }
       const dataJson = JSON.stringify(projectorData)
       console.log('Control: Sending to projector:', dataJson)
@@ -383,6 +387,7 @@ export function usePresentation() {
     liveStackIndex,
     liveSlideIndex,
     libraryRoot,
+    textScale,
 
     // Library management
     setLibraryRoot: (path) => { libraryRoot.value = path },

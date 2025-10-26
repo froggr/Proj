@@ -7,6 +7,7 @@
         :slide="liveSlide"
         :is-projector="true"
         :library-root="libraryRoot"
+        :text-scale="textScale"
         :transitionType="transitionType"
         @video-ended="onVideoEnded"
         @youtube-ended="onYouTubeEnded"
@@ -94,6 +95,7 @@ console.log('ProjectorView: Script loading')
 const liveSlide = ref(null)
 const transitionType = ref('none')
 const libraryRoot = ref(null)
+const textScale = ref(100)
 const showSplash = ref(true)
 let splashTimer = null
 
@@ -128,20 +130,23 @@ onMounted(() => {
         console.log('ProjectorView: Received slide data:', slideData)
         const data = typeof slideData === 'string' ? JSON.parse(slideData) : slideData
 
-        // Handle both old format (just slide) and new format (slide + transition + libraryRoot)
+        // Handle both old format (just slide) and new format (slide + transition + libraryRoot + textScale)
         if (data && typeof data === 'object' && 'slide' in data) {
           liveSlide.value = data.slide
           transitionType.value = data.transition || 'none'
           libraryRoot.value = data.libraryRoot || null
+          textScale.value = data.textScale || 100
         } else {
           // Backward compatibility: treat as just a slide
           liveSlide.value = data
           transitionType.value = 'none'
+          textScale.value = 100
         }
       } catch (error) {
         console.error('ProjectorView: Failed to parse slide data:', error)
         liveSlide.value = null
         transitionType.value = 'none'
+        textScale.value = 100
       }
     })
     console.log('ProjectorView: Listener set up successfully')
