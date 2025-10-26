@@ -1,13 +1,18 @@
 <template>
-  <div class="w-screen h-screen bg-black">
-    <SlidePreview
-      :slide="liveSlide"
-      :is-projector="true"
-      :library-root="libraryRoot"
-      :transitionType="transitionType"
-      @video-ended="onVideoEnded"
-      @youtube-ended="onYouTubeEnded"
-    />
+  <div class="w-screen h-screen bg-black relative">
+    <Transition name="fade" mode="out-in">
+      <SlidePreview
+        v-if="liveSlide"
+        :key="liveSlide ? 'slide' : 'empty'"
+        :slide="liveSlide"
+        :is-projector="true"
+        :library-root="libraryRoot"
+        :transitionType="transitionType"
+        @video-ended="onVideoEnded"
+        @youtube-ended="onYouTubeEnded"
+      />
+      <div v-else key="empty" class="w-full h-full bg-black"></div>
+    </Transition>
   </div>
 </template>
 
@@ -82,3 +87,16 @@ function onYouTubeEnded() {
   }
 }
 </script>
+
+<style scoped>
+/* Fade transition for clearing projection */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.5s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+</style>

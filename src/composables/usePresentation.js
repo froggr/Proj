@@ -184,7 +184,7 @@ export function usePresentation() {
       liveSlideIndex.value++
       console.log('Auto-advanced to next slide (live only):', liveSlideIndex.value)
       // Start auto-advance for the new slide
-      startAutoAdvance(liveStackIndex.value, liveSlideIndex.value)
+      handleAutoAdvance(liveStackIndex.value, liveSlideIndex.value)
     } else if (repeat) {
       // Loop back to first slide in stack (only update LIVE, not staged)
       console.log('At end of stack, looping back to first slide (live only)')
@@ -199,12 +199,12 @@ export function usePresentation() {
         setTimeout(() => {
           liveSlideIndex.value = tempIndex
           // Restart auto-advance
-          startAutoAdvance(liveStackIndex.value, liveSlideIndex.value)
+          handleAutoAdvance(liveStackIndex.value, liveSlideIndex.value)
         }, 50)
       } else {
         liveSlideIndex.value = 0
         // Start auto-advance for the first slide
-        startAutoAdvance(liveStackIndex.value, 0)
+        handleAutoAdvance(liveStackIndex.value, 0)
       }
     } else {
       // End of stack, stop auto-advance

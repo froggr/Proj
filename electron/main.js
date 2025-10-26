@@ -81,8 +81,6 @@ function createMainWindow() {
     const vitePort = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173'
     console.log('Loading main window from:', vitePort)
     mainWindow.loadURL(vitePort)
-    // Auto-open DevTools in development
-    mainWindow.webContents.openDevTools()
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
   }
@@ -90,29 +88,6 @@ function createMainWindow() {
   // Log when page finishes loading
   mainWindow.webContents.on('did-finish-load', () => {
     console.log('Main window finished loading')
-    if (isDev) {
-      console.log('Attempting to open DevTools...')
-
-      // Try opening DevTools multiple times with different approaches
-      setTimeout(() => {
-        console.log('Trying to open DevTools (attempt 1)...')
-        mainWindow.webContents.openDevTools()
-      }, 100)
-
-      setTimeout(() => {
-        if (!mainWindow.webContents.isDevToolsOpened()) {
-          console.log('Trying to open DevTools (attempt 2 - detached)...')
-          mainWindow.webContents.openDevTools({ mode: 'detach' })
-        }
-      }, 500)
-
-      setTimeout(() => {
-        if (!mainWindow.webContents.isDevToolsOpened()) {
-          console.log('Trying to open DevTools (attempt 3 - undocked)...')
-          mainWindow.webContents.openDevTools({ mode: 'undocked' })
-        }
-      }, 1000)
-    }
   })
 
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
@@ -131,8 +106,17 @@ function createMainWindow() {
     }
   })
 
+  mainWindow.on('close', () => {
+    // Close projector window when main window closes
+    if (projectorWindow && !projectorWindow.isDestroyed()) {
+      projectorWindow.close()
+    }
+  })
+
   mainWindow.on('closed', () => {
     mainWindow = null
+    // Quit the app when main window is closed
+    app.quit()
   })
 }
 
@@ -687,22 +671,46 @@ ipcMain.handle('import-assets-to-library', async (event, libPath, assetType) => 
 
 // App lifecycle
 app.whenReady().then(() => {
-  // Register custom protocol for loading local images
+  // Register custom protocol for loading local images and videos
   protocol.registerFileProtocol('local-image', (request, callback) => {
     // Remove 'local-image://' prefix and decode URI
     const filePath = decodeURIComponent(request.url.replace('local-image://', ''))
-    console.log('Loading local image:', filePath)
 
     try {
       // Verify file exists before returning
       if (fs.existsSync(filePath)) {
-        callback({ path: filePath })
+        // Determine MIME type from extension
+        const ext = path.extname(filePath).toLowerCase()
+        const mimeTypes = {
+          '.mp4': 'video/mp4',
+          '.webm': 'video/webm',
+          '.ogg': 'video/ogg',
+          '.png': 'image/png',
+          '.jpg': 'image/jpeg',
+          '.jpeg': 'image/jpeg',
+          '.gif': 'image/gif',
+          '.webp': 'image/webp'
+        }
+
+        const mimeType = mimeTypes[ext]
+
+        if (mimeType) {
+          callback({
+            path: filePath,
+            headers: {
+              'Content-Type': mimeType,
+              'Accept-Ranges': 'bytes'
+            }
+          })
+        } else {
+          callback({ path: filePath })
+        }
       } else {
-        console.error('Image file not found:', filePath)
+        console.error('Asset file not found:', filePath)
         callback({ error: -6 }) // FILE_NOT_FOUND
       }
     } catch (error) {
-      console.error('Error loading image:', error)
+      console.error('Error loading asset:', filePath, error)
       callback({ error: -2 }) // FAILED
     }
   })

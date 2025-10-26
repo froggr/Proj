@@ -65,31 +65,11 @@ function createMainWindow() {
     const vitePort = process.env.VITE_DEV_SERVER_URL || "http://localhost:5173";
     console.log("Loading main window from:", vitePort);
     mainWindow.loadURL(vitePort);
-    mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(path.join(__dirname, "../dist/index.html"));
   }
   mainWindow.webContents.on("did-finish-load", () => {
     console.log("Main window finished loading");
-    if (isDev) {
-      console.log("Attempting to open DevTools...");
-      setTimeout(() => {
-        console.log("Trying to open DevTools (attempt 1)...");
-        mainWindow.webContents.openDevTools();
-      }, 100);
-      setTimeout(() => {
-        if (!mainWindow.webContents.isDevToolsOpened()) {
-          console.log("Trying to open DevTools (attempt 2 - detached)...");
-          mainWindow.webContents.openDevTools({ mode: "detach" });
-        }
-      }, 500);
-      setTimeout(() => {
-        if (!mainWindow.webContents.isDevToolsOpened()) {
-          console.log("Trying to open DevTools (attempt 3 - undocked)...");
-          mainWindow.webContents.openDevTools({ mode: "undocked" });
-        }
-      }, 1e3);
-    }
   });
   mainWindow.webContents.on("did-fail-load", (event, errorCode, errorDescription) => {
     console.error("Main window failed to load:", errorCode, errorDescription);
@@ -104,8 +84,14 @@ function createMainWindow() {
       event.preventDefault();
     }
   });
+  mainWindow.on("close", () => {
+    if (projectorWindow && !projectorWindow.isDestroyed()) {
+      projectorWindow.close();
+    }
+  });
   mainWindow.on("closed", () => {
     mainWindow = null;
+    app.quit();
   });
 }
 function createProjectorWindow(monitorIndex = null) {
@@ -555,16 +541,37 @@ ipcMain.handle("import-assets-to-library", async (event, libPath, assetType) => 
 app.whenReady().then(() => {
   protocol.registerFileProtocol("local-image", (request, callback) => {
     const filePath = decodeURIComponent(request.url.replace("local-image://", ""));
-    console.log("Loading local image:", filePath);
     try {
       if (fs.existsSync(filePath)) {
-        callback({ path: filePath });
+        const ext = path.extname(filePath).toLowerCase();
+        const mimeTypes = {
+          ".mp4": "video/mp4",
+          ".webm": "video/webm",
+          ".ogg": "video/ogg",
+          ".png": "image/png",
+          ".jpg": "image/jpeg",
+          ".jpeg": "image/jpeg",
+          ".gif": "image/gif",
+          ".webp": "image/webp"
+        };
+        const mimeType = mimeTypes[ext];
+        if (mimeType) {
+          callback({
+            path: filePath,
+            headers: {
+              "Content-Type": mimeType,
+              "Accept-Ranges": "bytes"
+            }
+          });
+        } else {
+          callback({ path: filePath });
+        }
       } else {
-        console.error("Image file not found:", filePath);
+        console.error("Asset file not found:", filePath);
         callback({ error: -6 });
       }
     } catch (error) {
-      console.error("Error loading image:", error);
+      console.error("Error loading asset:", filePath, error);
       callback({ error: -2 });
     }
   });

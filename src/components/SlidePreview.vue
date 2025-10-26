@@ -25,7 +25,8 @@
 
         <div v-else-if="slide && slide.type === 'image'" :key="`image-${slide.imageUrl}`" class="w-full h-full">
           <img
-            :src="resolvedImageUrl || slide.imageUrl"
+            v-if="resolvedImageUrl"
+            :src="resolvedImageUrl"
             :alt="slide.title"
             class="w-full h-full object-contain"
             loading="lazy"
@@ -95,17 +96,43 @@
           class="w-full h-full flex items-center justify-center bg-black"
         >
           <video
+            v-if="resolvedVideoUrl"
             ref="videoRef"
-            :key="slide.videoUrl"
-            :src="resolvedVideoUrl || slide.videoUrl"
+            :key="resolvedVideoUrl"
+            :src="resolvedVideoUrl"
             class="max-w-full max-h-full"
             :controls="!isProjector"
             :autoplay="isProjector"
             :muted="!isProjector"
             playsinline
             preload="auto"
+            @loadeddata="() => {
+              // Successfully loaded - reset retry count
+              videoRetryCount.value = 0
+            }"
+            @error="(e) => {
+              const video = e.target
+              const error = video.error
+              console.error('Video error:', {
+                code: error?.code,
+                message: error?.message,
+                MEDIA_ERR_ABORTED: error?.code === 1,
+                MEDIA_ERR_NETWORK: error?.code === 2,
+                MEDIA_ERR_DECODE: error?.code === 3,
+                MEDIA_ERR_SRC_NOT_SUPPORTED: error?.code === 4,
+                src: video.src,
+                networkState: video.networkState,
+                readyState: video.readyState,
+                retryAttempt: videoRetryCount.value
+              })
+              // Retry loading the video
+              retryVideoLoad()
+            }"
             @ended="onVideoEnded"
           />
+          <div v-else class="text-neutral-500 text-sm">
+            Loading video...
+          </div>
         </div>
 
         <div
@@ -192,7 +219,10 @@
 </template>
 
 <script setup>
-import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+
+// Global cache for resolved asset URLs (shared across all component instances)
+const assetUrlCache = new Map()
 
 const props = defineProps({
   slide: {
@@ -250,6 +280,8 @@ const youtubeOverlayOpacity = ref(0)
 const youtubePlayerState = ref(null) // Track state to avoid duplicate events
 const resolvedImageUrl = ref(null)
 const resolvedVideoUrl = ref(null)
+const videoRetryCount = ref(0)
+const videoRetryTimer = ref(null)
 
 // Resolve assets:// URLs to local-image:// URLs
 async function resolveAssetUrl(assetUrl) {
@@ -266,24 +298,70 @@ async function resolveAssetUrl(assetUrl) {
     return assetUrl
   }
 
+  // Check cache first
+  const cacheKey = `${props.libraryRoot}::${assetUrl}`
+  if (assetUrlCache.has(cacheKey)) {
+    return assetUrlCache.get(cacheKey)
+  }
+
   try {
     // resolveAssetPath now returns local-image:// URLs directly
     const resolvedUrl = await window.electronAPI.resolveAssetPath(props.libraryRoot, assetUrl)
-    console.log('SlidePreview: Asset URL resolved', {
-      original: assetUrl,
-      resolved: resolvedUrl,
-      libraryRoot: props.libraryRoot
-    })
-    return resolvedUrl || assetUrl
+    const finalUrl = resolvedUrl || assetUrl
+
+    // Cache the result
+    assetUrlCache.set(cacheKey, finalUrl)
+
+    return finalUrl
   } catch (error) {
-    console.error('SlidePreview: Failed to resolve asset URL:', assetUrl, error)
+    console.error('Failed to resolve asset URL:', assetUrl, error)
     return assetUrl
   }
+}
+
+// Retry loading video on error (workaround for problematic video files)
+function retryVideoLoad() {
+  const MAX_RETRIES = 3
+  const RETRY_DELAY = 500 // ms
+
+  if (videoRetryCount.value >= MAX_RETRIES) {
+    console.error('Video failed to load after', MAX_RETRIES, 'retries')
+    return
+  }
+
+  videoRetryCount.value++
+  console.log(`Retrying video load (attempt ${videoRetryCount.value}/${MAX_RETRIES})...`)
+
+  // Clear any existing timer
+  if (videoRetryTimer.value) {
+    clearTimeout(videoRetryTimer.value)
+  }
+
+  // Force reload by clearing and resetting the URL
+  videoRetryTimer.value = setTimeout(() => {
+    const currentUrl = resolvedVideoUrl.value
+    resolvedVideoUrl.value = null
+
+    setTimeout(() => {
+      resolvedVideoUrl.value = currentUrl
+    }, 50)
+  }, RETRY_DELAY)
 }
 
 // Watch for slide changes and resolve URLs
 // Also watch libraryRoot so URLs are re-resolved when library opens
 watch([() => props.slide, () => props.libraryRoot], async ([newSlide]) => {
+  // Reset retry count when slide changes
+  videoRetryCount.value = 0
+  if (videoRetryTimer.value) {
+    clearTimeout(videoRetryTimer.value)
+    videoRetryTimer.value = null
+  }
+
+  // Clear resolved URLs when slide changes
+  resolvedImageUrl.value = null
+  resolvedVideoUrl.value = null
+
   if (newSlide?.type === 'image' && newSlide.imageUrl) {
     resolvedImageUrl.value = await resolveAssetUrl(newSlide.imageUrl)
   }
@@ -507,6 +585,12 @@ onMounted(() => {
 onBeforeUnmount(() => {
   if (youtubeMessageListener && typeof window !== 'undefined') {
     window.removeEventListener('message', youtubeMessageListener)
+  }
+
+  // Clean up video retry timer
+  if (videoRetryTimer.value) {
+    clearTimeout(videoRetryTimer.value)
+    videoRetryTimer.value = null
   }
 
   // Clean up IPC listeners
