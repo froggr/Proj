@@ -26,6 +26,67 @@ global.sendToMainWindow = (event, data) => {
     mainWindow.webContents.send(event, data);
   }
 };
+function setupApplicationMenu() {
+  const isMac = process.platform === "darwin";
+  const template = [
+    // App menu (Mac only)
+    ...isMac ? [{
+      label: app.getName(),
+      submenu: [
+        { role: "about" },
+        { type: "separator" },
+        { role: "hide" },
+        { role: "hideOthers" },
+        { role: "unhide" },
+        { type: "separator" },
+        { role: "quit" }
+      ]
+    }] : [],
+    // File menu
+    {
+      label: "File",
+      submenu: [
+        isMac ? { role: "close" } : { role: "quit" }
+      ]
+    },
+    // View menu
+    {
+      label: "View",
+      submenu: [
+        {
+          label: "Toggle Fullscreen",
+          accelerator: isMac ? "Ctrl+Cmd+F" : "F11",
+          click: () => {
+            const targetWindow = projectorWindow || mainWindow;
+            if (targetWindow && !targetWindow.isDestroyed()) {
+              targetWindow.setFullScreen(!targetWindow.isFullScreen());
+            }
+          }
+        },
+        { type: "separator" },
+        { role: "reload" },
+        { role: "forceReload" },
+        { role: "toggleDevTools" }
+      ]
+    },
+    // Window menu
+    {
+      label: "Window",
+      submenu: [
+        { role: "minimize" },
+        { role: "zoom" },
+        ...isMac ? [
+          { type: "separator" },
+          { role: "front" }
+        ] : [
+          { role: "close" }
+        ]
+      ]
+    }
+  ];
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+}
 const isDev = !app.isPackaged;
 console.log("=================================");
 console.log("app.isPackaged:", app.isPackaged);
@@ -41,7 +102,9 @@ function createMainWindow() {
     width: 1400,
     height: 900,
     frame: false,
-    // Frameless window for custom title bar
+    fullscreenable: true,
+    simpleFullscreen: false,
+    // Use native macOS fullscreen
     webPreferences: {
       devTools: true,
       preload: path.join(__dirname, "preload.js"),
@@ -50,7 +113,7 @@ function createMainWindow() {
       webSecurity: false,
       allowRunningInsecureContent: true
     },
-    title: "DongleControl Projector"
+    title: "DCProjector"
   });
   const template = [
     {
@@ -114,10 +177,11 @@ function createProjectorWindow(monitorIndex = null) {
     width: 1280,
     height: 720,
     frame: true,
-    // Keep frame so you can drag it
     fullscreen: false,
+    fullscreenable: true,
+    simpleFullscreen: false,
+    // Use native macOS fullscreen
     skipTaskbar: false,
-    // Show in taskbar so it's easier to find
     show: false,
     alwaysOnTop: true,
     backgroundColor: "#000000",
@@ -128,15 +192,15 @@ function createProjectorWindow(monitorIndex = null) {
       webSecurity: false,
       allowRunningInsecureContent: true
     },
-    title: "DongleControl Projector - Drag me to display, then press F11"
+    title: "DCProjector"
   });
   projectorWindow.once("ready-to-show", () => {
     projectorWindow.show();
-    console.log("✓ Projector window opened");
-    console.log("📌 Drag it to your target display, then press F11 for fullscreen");
   });
   projectorWindow.webContents.on("before-input-event", (event, input) => {
-    if (input.key === "F11" && input.type === "keyDown") {
+    const isMac = process.platform === "darwin";
+    const isFullscreenShortcut = input.key === "F11" && !isMac || input.key === "f" && input.control && input.meta && isMac;
+    if (isFullscreenShortcut && input.type === "keyDown") {
       const isFullScreen = projectorWindow.isFullScreen();
       projectorWindow.setFullScreen(!isFullScreen);
       console.log(isFullScreen ? "📺 Exited fullscreen" : "📺 Entered fullscreen");
@@ -616,7 +680,9 @@ function sendLogToRenderer(message) {
     mainWindow.webContents.send("main-process-log", message);
   }
 }
+app.setName("DCProjector");
 app.whenReady().then(() => {
+  setupApplicationMenu();
   protocol.registerFileProtocol("local-image", (request, callback) => {
     const logMsg = `local-image protocol request: ${request.url}`;
     console.log(logMsg);

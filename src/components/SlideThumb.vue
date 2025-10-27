@@ -15,9 +15,13 @@
         <div class="font-semibold mb-1">{{ slide.reference }}</div>
         <div class="line-clamp-3">{{ slide.text }}</div>
       </div>
-      <div v-else-if="slide.type === 'youtube'" class="text-center">
-        <div class="text-red-500 text-2xl mb-2">▶</div>
-        <div class="text-xs text-gray-300">{{ slide.title }}</div>
+      <div v-else-if="slide.type === 'youtube'" class="w-full h-full">
+        <img
+          :src="`https://img.youtube.com/vi/${slide.videoId}/mqdefault.jpg`"
+          :alt="slide.title"
+          class="w-full h-full object-cover"
+          @error="(e) => e.target.style.display = 'none'"
+        />
       </div>
       <div v-else-if="slide.type === 'canva'" class="text-center text-xs text-gray-300">
         <div class="text-purple-500 text-2xl mb-2">🎨</div>

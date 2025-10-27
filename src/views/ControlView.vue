@@ -422,14 +422,11 @@
           >
             <!-- Gold staging border -->
             <div class="absolute inset-0 border-4 border-gold-500 rounded-lg pointer-events-none shadow-lg shadow-gold-500/50"></div>
-            <SlidePreview
+            <SlideStaged
               :slide="currentSlide"
-              :isStaged="true"
               :library-root="libraryRoot"
               :text-scale="textScale"
-              :transitionType="currentStack?.autoAdvance?.transition || 'none'"
-              @video-ended="onVideoComplete"
-              @youtube-ended="onVideoComplete"
+              :transition-type="currentStack?.autoAdvance?.transition || 'none'"
             />
           </div>
         </div>
@@ -446,13 +443,10 @@
           <div v-else class="text-[9px] text-neutral-600">Idle</div>
         </div>
         <div class="aspect-video bg-black rounded border border-neutral-700 overflow-hidden">
-          <SlidePreview
+          <SlideThumbnail
             :slide="liveSlide"
             :library-root="libraryRoot"
             :text-scale="textScale"
-            :transitionType="liveStack?.autoAdvance?.transition || 'none'"
-            @video-ended="onVideoComplete"
-            @youtube-ended="onVideoComplete"
           />
         </div>
       </div>
@@ -489,7 +483,7 @@
               ]"
             >
               <div class="w-full h-full bg-black relative">
-                <SlidePreview :slide="slide" :library-root="libraryRoot" :text-scale="textScale" />
+                <SlideThumbnail :slide="slide" :library-root="libraryRoot" :text-scale="textScale" />
                 <div class="absolute bottom-0.5 left-0.5 px-1 py-0.5 bg-black/80 text-[9px] text-neutral-400 font-medium rounded">
                   {{ index + 1 }}
                 </div>
@@ -515,6 +509,9 @@
         {{ currentStack.title }} • {{ currentStack.slides.length }} slide{{ currentStack.slides.length !== 1 ? 's' : '' }}
       </div>
     </div>
+
+    <!-- Projector Video Controls (appears when video/YouTube is live) -->
+    <ProjectorVideoControls :live-slide="liveSlide" />
 
     <!-- Add Slide Menu -->
     <div
@@ -795,7 +792,9 @@ import { usePresentation } from '../composables/usePresentation'
 import { useKeyboard } from '../composables/useKeyboard'
 import { useProjector } from '../composables/useProjector'
 import { useLibrary } from '../composables/useLibrary'
-import SlidePreview from '../components/SlidePreview.vue'
+import SlideStaged from '../components/slides/SlideStaged.vue'
+import SlideThumbnail from '../components/slides/SlideThumbnail.vue'
+import ProjectorVideoControls from '../components/ProjectorVideoControls.vue'
 import Modal from '../components/Modal.vue'
 import CustomSlideEditor from '../components/CustomSlideEditor.vue'
 import AddBibleSlide from '../components/AddBibleSlide.vue'

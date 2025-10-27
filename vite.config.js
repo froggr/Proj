@@ -2,8 +2,14 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import electron from 'vite-plugin-electron'
 import renderer from 'vite-plugin-electron-renderer'
+import path from 'path'
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src')
+    }
+  },
   plugins: [
     vue(),
     electron([
@@ -22,6 +28,17 @@ export default defineConfig({
           // Only auto-start if not using separate mode
           if (process.env.ELECTRON_SEPARATE !== 'true') {
             startup(['.', '--no-sandbox', '--disable-setuid-sandbox'])
+          }
+        }
+      },
+      {
+        // Remote server module
+        entry: 'electron/remoteServer.js',
+        vite: {
+          build: {
+            rollupOptions: {
+              external: ['electron', 'express', 'http', 'socket.io']
+            }
           }
         }
       },

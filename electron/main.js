@@ -37,6 +37,71 @@ global.sendToMainWindow = (event, data) => {
   }
 }
 
+// Setup application menu (required for Mac keyboard shortcuts to work)
+function setupApplicationMenu() {
+  const isMac = process.platform === 'darwin'
+
+  const template = [
+    // App menu (Mac only)
+    ...(isMac ? [{
+      label: app.getName(),
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        { role: 'hide' },
+        { role: 'hideOthers' },
+        { role: 'unhide' },
+        { type: 'separator' },
+        { role: 'quit' }
+      ]
+    }] : []),
+    // File menu
+    {
+      label: 'File',
+      submenu: [
+        isMac ? { role: 'close' } : { role: 'quit' }
+      ]
+    },
+    // View menu
+    {
+      label: 'View',
+      submenu: [
+        {
+          label: 'Toggle Fullscreen',
+          accelerator: isMac ? 'Ctrl+Cmd+F' : 'F11',
+          click: () => {
+            const targetWindow = projectorWindow || mainWindow
+            if (targetWindow && !targetWindow.isDestroyed()) {
+              targetWindow.setFullScreen(!targetWindow.isFullScreen())
+            }
+          }
+        },
+        { type: 'separator' },
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { role: 'toggleDevTools' }
+      ]
+    },
+    // Window menu
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'zoom' },
+        ...(isMac ? [
+          { type: 'separator' },
+          { role: 'front' }
+        ] : [
+          { role: 'close' }
+        ])
+      ]
+    }
+  ]
+
+  const menu = Menu.buildFromTemplate(template)
+  Menu.setApplicationMenu(menu)
+}
+
 // Determine if we're in development mode
 const isDev = !app.isPackaged
 console.log('=================================')
@@ -55,7 +120,9 @@ function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
-    frame: false, // Frameless window for custom title bar
+    frame: false,
+    fullscreenable: true,
+    simpleFullscreen: false, // Use native macOS fullscreen
     webPreferences: {
       devTools: true,
       preload: path.join(__dirname, 'preload.js'),
@@ -64,7 +131,7 @@ function createMainWindow() {
       webSecurity: false,
       allowRunningInsecureContent: true
     },
-    title: 'DongleControl Projector'
+    title: 'DCProjector'
   })
 
   // Create application menu with dev tools
@@ -142,9 +209,11 @@ function createProjectorWindow(monitorIndex = null) {
   projectorWindow = new BrowserWindow({
     width: 1280,
     height: 720,
-    frame: true,  // Keep frame so you can drag it
+    frame: true,
     fullscreen: false,
-    skipTaskbar: false,  // Show in taskbar so it's easier to find
+    fullscreenable: true,
+    simpleFullscreen: false, // Use native macOS fullscreen
+    skipTaskbar: false,
     show: false,
     alwaysOnTop: true,
     backgroundColor: '#000000',
@@ -155,19 +224,22 @@ function createProjectorWindow(monitorIndex = null) {
       webSecurity: false,
       allowRunningInsecureContent: true
     },
-    title: 'DongleControl Projector - Drag me to display, then press F11'
+    title: 'DCProjector'
   })
 
   projectorWindow.once('ready-to-show', () => {
     projectorWindow.show()
-    console.log('✓ Projector window opened')
-    console.log('📌 Drag it to your target display, then press F11 for fullscreen')
   })
 
   // Keyboard shortcuts for fullscreen
   projectorWindow.webContents.on('before-input-event', (event, input) => {
-    // F11 to toggle fullscreen
-    if (input.key === 'F11' && input.type === 'keyDown') {
+    const isMac = process.platform === 'darwin'
+
+    // F11 (Windows/Linux) or Ctrl+Cmd+F (Mac) to toggle fullscreen
+    const isFullscreenShortcut = (input.key === 'F11' && !isMac) ||
+                                  (input.key === 'f' && input.control && input.meta && isMac)
+
+    if (isFullscreenShortcut && input.type === 'keyDown') {
       const isFullScreen = projectorWindow.isFullScreen()
       projectorWindow.setFullScreen(!isFullScreen)
       console.log(isFullScreen ? '📺 Exited fullscreen' : '📺 Entered fullscreen')
@@ -779,8 +851,13 @@ function sendLogToRenderer(message) {
   }
 }
 
+// Set app name (in dev, it defaults to "Electron")
+app.setName('DCProjector')
+
 // App lifecycle
 app.whenReady().then(() => {
+  setupApplicationMenu()
+
   // Register custom protocol for loading local images and videos
   protocol.registerFileProtocol('local-image', (request, callback) => {
     const logMsg = `local-image protocol request: ${request.url}`

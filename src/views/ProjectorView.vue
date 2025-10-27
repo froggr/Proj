@@ -1,14 +1,13 @@
 <template>
   <div class="w-screen h-screen bg-black relative">
     <Transition name="fade" mode="out-in">
-      <SlidePreview
+      <SlideProjector
         v-if="liveSlide"
         :key="liveSlide ? 'slide' : 'empty'"
         :slide="liveSlide"
-        :is-projector="true"
         :library-root="libraryRoot"
         :text-scale="textScale"
-        :transitionType="transitionType"
+        :transition-type="transitionType"
         @video-ended="onVideoEnded"
         @youtube-ended="onYouTubeEnded"
       />
@@ -88,7 +87,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue'
-import SlidePreview from '../components/SlidePreview.vue'
+import SlideProjector from '../components/slides/SlideProjector.vue'
 
 console.log('ProjectorView: Script loading')
 
