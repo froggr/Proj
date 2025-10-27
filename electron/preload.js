@@ -81,5 +81,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   listLibraryAssets: (libPath) => ipcRenderer.invoke('list-library-assets', libPath),
   importAssetsToLibrary: (libPath, assetType) => ipcRenderer.invoke('import-assets-to-library', libPath, assetType),
   checkAssetUsage: (libPath, assetUrl) => ipcRenderer.invoke('check-asset-usage', libPath, assetUrl),
-  deleteLibraryAsset: (libPath, assetPath) => ipcRenderer.invoke('delete-library-asset', libPath, assetPath)
+  deleteLibraryAsset: (libPath, assetPath) => ipcRenderer.invoke('delete-library-asset', libPath, assetPath),
+
+  // Remote control
+  broadcastPresentationState: (state) => ipcRenderer.invoke('broadcast-presentation-state', state),
+  onRemoteCommand: (callback) => {
+    // Listen for various remote control events
+    const events = ['remote-stage-next', 'remote-stage-prev', 'remote-go-live', 'remote-clear', 'remote-stage-slide', 'remote-next-stack', 'remote-prev-stack']
+    events.forEach(event => {
+      ipcRenderer.on(event, (_, data) => callback(event, data))
+    })
+  }
 })

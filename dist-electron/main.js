@@ -1,1 +1,705 @@
-"use strict";const{app:g,BrowserWindow:P,ipcMain:c,screen:C,dialog:S,Menu:$,protocol:E}=require("electron"),l=require("path"),i=require("fs");console.log("Forcing X11/XWayland for Wayland compatibility");g.commandLine.appendSwitch("--ozone-platform=x11");g.commandLine.appendSwitch("--no-sandbox");g.commandLine.appendSwitch("--disable-setuid-sandbox");console.log("Using X11 mode with hardware acceleration enabled");E.registerSchemesAsPrivileged([{scheme:"local-image",privileges:{secure:!0,supportFetchAPI:!0,bypassCSP:!0,stream:!0}}]);let o=null,a=null;const D=!g.isPackaged;console.log("=================================");console.log("app.isPackaged:",g.isPackaged);console.log("Development mode:",D);console.log("process.env.NODE_ENV:",process.env.NODE_ENV);console.log("process.argv:",process.argv);console.log("=================================");D&&g.commandLine.appendSwitch("--disable-features=OutOfBlinkCors");function k(){o=new P({width:1400,height:900,frame:!1,webPreferences:{devTools:!0,preload:l.join(__dirname,"preload.js"),nodeIntegration:!1,contextIsolation:!0,webSecurity:!1,allowRunningInsecureContent:!0},title:"DongleControl Projector"});const r=[{label:"View",submenu:[{role:"reload"},{role:"forceReload"},{type:"separator"},{role:"toggleDevTools"},{type:"separator"},{role:"resetZoom"},{role:"zoomIn"},{role:"zoomOut"}]}],n=$.buildFromTemplate(r);if($.setApplicationMenu(n),D){const t=process.env.VITE_DEV_SERVER_URL||"http://localhost:5173";console.log("Loading main window from:",t),o.loadURL(t)}else o.loadFile(l.join(__dirname,"../dist/index.html"));o.webContents.on("did-finish-load",()=>{console.log("Main window finished loading")}),o.webContents.on("did-fail-load",(t,e,s)=>{console.error("Main window failed to load:",e,s)}),o.webContents.on("before-input-event",(t,e)=>{e.control&&e.shift&&e.key.toLowerCase()==="i"&&(o.webContents.toggleDevTools(),t.preventDefault()),e.key==="F12"&&(o.webContents.toggleDevTools(),t.preventDefault())}),o.on("close",()=>{a&&!a.isDestroyed()&&a.close()}),o.on("closed",()=>{o=null,g.quit()})}function L(r=null){if(console.log("====================================="),console.log("Opening projector window (Wayland-compatible mode)"),console.log("Instructions:"),console.log("  1. Drag the window to your projector/display"),console.log("  2. Press F11 to toggle fullscreen"),console.log("  3. Press Escape to exit fullscreen"),console.log("====================================="),a=new P({width:1280,height:720,frame:!0,fullscreen:!1,skipTaskbar:!1,show:!1,alwaysOnTop:!0,backgroundColor:"#000000",webPreferences:{nodeIntegration:!1,contextIsolation:!0,preload:l.join(__dirname,"preload.js"),webSecurity:!1,allowRunningInsecureContent:!0},title:"DongleControl Projector - Drag me to display, then press F11"}),a.once("ready-to-show",()=>{a.show(),console.log("✓ Projector window opened"),console.log("📌 Drag it to your target display, then press F11 for fullscreen")}),a.webContents.on("before-input-event",(n,t)=>{if(t.key==="F11"&&t.type==="keyDown"){const e=a.isFullScreen();a.setFullScreen(!e),console.log(e?"📺 Exited fullscreen":"📺 Entered fullscreen"),n.preventDefault()}t.key==="Escape"&&t.type==="keyDown"&&a.isFullScreen()&&(a.setFullScreen(!1),console.log("📺 Exited fullscreen"),n.preventDefault())}),D){const n=process.env.VITE_DEV_SERVER_URL||"http://localhost:5173";a.loadURL(n+"/projector")}else a.loadFile(l.join(__dirname,"../dist/index.html"),{hash:"/projector"});return a.on("closed",()=>{a=null}),a}c.handle("get-available-monitors",()=>{const r=C.getAllDisplays();console.log(`IPC: get-available-monitors returning ${r.length} displays`);const n=r.map((t,e)=>{const s=t.id===C.getPrimaryDisplay().id;return`Monitor ${e+1}${s?" (Primary)":""} - ${t.bounds.width}x${t.bounds.height}`});return console.log("Available monitors:",n),n});c.handle("open-projector-window",(r,n)=>{if(a)return a.focus(),{success:!0};try{return L(n),{success:!0}}catch(t){return console.error("Failed to open projector:",t),{success:!1,error:t.message}}});c.handle("close-projector-window",()=>(a&&(a.close(),a=null),{success:!0}));c.handle("update-projector",(r,n)=>(console.log("Main: Received update-projector, data length:",n.length),a&&!a.isDestroyed()?(console.log("Main: Sending to projector window"),a.webContents.send("update-slide",n),{success:!0}):(console.log("Main: Projector window not available"),{success:!1,error:"Projector window not open"})));c.on("video-ended",()=>{console.log("Main: Video ended notification from projector, forwarding to control window"),o&&!o.isDestroyed()&&o.webContents.send("video-ended-notification")});c.on("control-projector-video",(r,n,t)=>{console.log("Main: Video control command from control window:",n,t),a&&!a.isDestroyed()&&a.webContents.send("video-control-command",n,t)});c.on("video-state-update",(r,n)=>{o&&!o.isDestroyed()&&o.webContents.send("video-state-notification",n)});c.handle("window-minimize",()=>{o&&!o.isDestroyed()&&o.minimize()});c.handle("window-maximize",()=>{o&&!o.isDestroyed()&&(o.isMaximized()?o.unmaximize():o.maximize())});c.handle("window-close",()=>{o&&!o.isDestroyed()&&o.close()});c.handle("save-presentation",async(r,n)=>{try{const{filePath:t,canceled:e}=await S.showSaveDialog(o,{title:"Save Presentation",defaultPath:"presentation.json",filters:[{name:"JSON Files",extensions:["json"]},{name:"All Files",extensions:["*"]}]});return!e&&t?(i.writeFileSync(t,n,"utf-8"),{success:!0,filePath:t}):{success:!1,canceled:!0}}catch(t){return console.error("Save failed:",t),{success:!1,error:t.message}}});c.handle("load-presentation",async()=>{try{const{filePaths:r,canceled:n}=await S.showOpenDialog(o,{title:"Load Presentation",filters:[{name:"JSON Files",extensions:["json"]},{name:"All Files",extensions:["*"]}],properties:["openFile"]});return!n&&r.length>0?{success:!0,data:i.readFileSync(r[0],"utf-8")}:{success:!1,canceled:!0}}catch(r){return console.error("Load failed:",r),{success:!1,error:r.message}}});c.handle("select-images",async()=>{try{const{filePaths:r,canceled:n}=await S.showOpenDialog(o,{title:"Select Images",filters:[{name:"Images",extensions:["png","jpg","jpeg","gif","webp","svg","bmp"]}],properties:["openFile","multiSelections"]});return!n&&r.length>0?{success:!0,files:r}:{success:!1,canceled:!0}}catch(r){return console.error("Image selection failed:",r),{success:!1,error:r.message}}});c.handle("create-library",async(r,n,t)=>{try{const e=l.join(n,`${t}.dclib`);i.mkdirSync(e,{recursive:!0}),i.mkdirSync(l.join(e,"assets","branding"),{recursive:!0}),i.mkdirSync(l.join(e,"assets","media"),{recursive:!0}),i.mkdirSync(l.join(e,"assets",".trash"),{recursive:!0}),i.mkdirSync(l.join(e,"events"),{recursive:!0});const s={name:t,created:new Date().toISOString(),version:"1.0",lastOpened:new Date().toISOString()};return i.writeFileSync(l.join(e,"library.json"),JSON.stringify(s,null,2),"utf-8"),e}catch(e){return console.error("Create library failed:",e),null}});c.handle("load-library-metadata",async(r,n)=>{try{const t=l.join(n,"library.json");if(i.existsSync(t)){const e=i.readFileSync(t,"utf-8");return JSON.parse(e)}return null}catch(t){return console.error("Load library metadata failed:",t),null}});c.handle("save-library-metadata",async(r,n,t)=>{try{const e=l.join(n,"library.json");return i.writeFileSync(e,JSON.stringify(t,null,2),"utf-8"),!0}catch(e){return console.error("Save library metadata failed:",e),!1}});c.handle("list-library-events",async(r,n)=>{try{const t=l.join(n,"events");return i.existsSync(t)?i.readdirSync(t).filter(s=>s.endsWith(".json")).map(s=>s.replace(".json","")).sort():[]}catch(t){return console.error("List library events failed:",t),[]}});c.handle("create-library-event",async(r,n,t)=>{try{const e=l.join(n,"events",`${t}.json`),s={title:t,stacks:[]};return i.writeFileSync(e,JSON.stringify(s,null,2),"utf-8"),e}catch(e){return console.error("Create library event failed:",e),null}});c.handle("load-library-event",async(r,n,t)=>{try{const e=l.join(n,"events",`${t}.json`);if(!i.existsSync(e))return{success:!1,error:"Event not found"};const s=i.readFileSync(e,"utf-8");return{success:!0,data:JSON.parse(s),path:e}}catch(e){return console.error("Load library event failed:",e),{success:!1,error:e.message}}});c.handle("save-library-event",async(r,n,t)=>{try{return i.writeFileSync(n,JSON.stringify(t,null,2),"utf-8"),!0}catch(e){return console.error("Save library event failed:",e),!1}});c.handle("delete-library-event",async(r,n,t)=>{try{const e=l.join(n,"events",`${t}.json`);return i.existsSync(e)?(i.unlinkSync(e),!0):!1}catch(e){return console.error("Delete library event failed:",e),!1}});c.handle("resolve-asset-path",async(r,n,t)=>{try{if(t.startsWith("local-image://"))return t;if(t.startsWith("file://")){let d=t.replace("file://","");return process.platform==="win32"&&d.startsWith("/")&&(d=d.substring(1)),`local-image://${d}`}if(!t.startsWith("assets://"))return t;const e=t.replace("assets://","assets/"),s=l.join(n,e);if(i.existsSync(s))return`local-image://${process.platform==="win32"?s.replace(/\\/g,"/"):s}`;const f=s.replace("/assets/","/assets/.trash/");return i.existsSync(f)?f:null}catch(e){return console.error("Resolve asset path failed:",e),null}});c.handle("select-library-folder",async()=>{try{const{filePaths:r,canceled:n}=await S.showOpenDialog(o,{title:"Select Library Folder",properties:["openDirectory"]});return!n&&r.length>0?{success:!0,path:r[0]}:{success:!1,canceled:!0}}catch(r){return console.error("Select library folder failed:",r),{success:!1,error:r.message}}});c.handle("list-library-assets",async(r,n)=>{try{let e=function(m,j){if(!i.existsSync(m))return;const F=i.readdirSync(m,{withFileTypes:!0});for(const u of F)if(u.isDirectory()){if(u.name===".trash")continue;const y=l.join(m,u.name),b=`${j}${u.name}/`;e(y,b)}else if(u.isFile()){const y=u.name.split(".").pop().toLowerCase(),b=l.join(m,u.name),x=`${j}${u.name}`;let h=null;f.includes(y)?h="image":d.includes(y)&&(h="video"),h&&s.push({filename:u.name,path:b,url:x,type:h})}};var t=e;if(!n)return{success:!1,assets:[]};const s=[],f=["png","jpg","jpeg","gif","webp","svg","bmp"],d=["mp4","webm","ogg","mov","avi","mkv"],p=l.join(n,"assets","branding");e(p,"assets://branding/");const w=l.join(n,"assets","media");return e(w,"assets://media/"),{success:!0,assets:s}}catch(e){return console.error("List library assets failed:",e),{success:!1,assets:[],error:e.message}}});c.handle("import-assets-to-library",async(r,n,t)=>{try{if(!n)return{success:!1,error:"No library open"};let e=[];t==="image"?e=[{name:"Images",extensions:["png","jpg","jpeg","gif","webp","svg","bmp"]}]:t==="video"?e=[{name:"Videos",extensions:["mp4","webm","ogg","mov","avi","mkv"]}]:e=[{name:"Media Files",extensions:["png","jpg","jpeg","gif","webp","svg","bmp","mp4","webm","ogg","mov","avi","mkv"]}];const{filePaths:s,canceled:f}=await S.showOpenDialog(o,{title:"Import Assets",filters:e,properties:["openFile","multiSelections"]});if(f||s.length===0)return{success:!1,canceled:!0};const d=new Date,p=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`,w=l.join(n,"assets","media",p);i.mkdirSync(w,{recursive:!0});const m=[],j=["png","jpg","jpeg","gif","webp","svg","bmp"],F=["mp4","webm","ogg","mov","avi","mkv"];for(const u of s){const y=l.basename(u),b=l.join(w,y);i.copyFileSync(u,b);const x=y.split(".").pop().toLowerCase();let h="unknown";j.includes(x)?h="image":F.includes(x)&&(h="video");const I=`assets://media/${p}/${y}`;m.push({filename:y,path:b,url:I,type:h})}return{success:!0,assets:m}}catch(e){return console.error("Import assets failed:",e),{success:!1,error:e.message}}});c.handle("check-asset-usage",async(r,n,t)=>{try{if(!n||!t)return[];const e=l.join(n,"events");if(!i.existsSync(e))return[];const s=i.readdirSync(e).filter(d=>d.endsWith(".json")),f=[];for(const d of s){const p=l.join(e,d);try{if(i.readFileSync(p,"utf-8").includes(t)){const m=d.replace(".json","");f.push(m)}}catch(w){console.error(`Error reading event file ${d}:`,w)}}return f}catch(e){return console.error("Check asset usage failed:",e),[]}});c.handle("delete-library-asset",async(r,n,t)=>{try{return!n||!t?{success:!1,error:"Invalid parameters"}:t.startsWith(n)?i.existsSync(t)?(i.unlinkSync(t),console.log("Asset deleted:",t),{success:!0}):{success:!1,error:"Asset file not found"}:{success:!1,error:"Asset path is not within library"}}catch(e){return console.error("Delete asset failed:",e),{success:!1,error:e.message}}});function v(r){o&&o.webContents&&o.webContents.send("main-process-log",r)}g.whenReady().then(()=>{E.registerFileProtocol("local-image",(r,n)=>{const t=`local-image protocol request: ${r.url}`;console.log(t),v(t);let e=decodeURIComponent(r.url.replace("local-image://",""));v(`After removing protocol: ${e}`),process.platform==="win32"&&e.match(/^\/[A-Za-z]:/)&&(e=e.substring(1),v(`After removing leading slash: ${e}`)),process.platform==="win32"&&(e=e.replace(/\//g,"\\"),v(`After converting slashes: ${e}`),e.match(/^[A-Za-z]:\\/)||(v(`WARNING: Path missing colon after drive letter: ${e}`),e=e.replace(/^([A-Za-z])\\/,"$1:\\"),v(`Fixed path: ${e}`)));try{if(v(`Checking if file exists: ${e}`),i.existsSync(e)){v(`File exists! Returning path: ${e}`);const s=i.statSync(e),f=l.extname(e).toLowerCase(),p={".mp4":"video/mp4",".webm":"video/webm",".ogg":"video/ogg",".png":"image/png",".jpg":"image/jpeg",".jpeg":"image/jpeg",".gif":"image/gif",".webp":"image/webp"}[f];p?n({path:e,headers:{"Content-Type":p,"Accept-Ranges":"bytes","Cache-Control":"public, max-age=31536000, immutable",ETag:`"${s.mtime.getTime()}-${s.size}"`,"Last-Modified":s.mtime.toUTCString()}}):(console.log("Returning path to callback:",e),n({path:e}))}else{console.error("Asset file not found:",e);const s=decodeURIComponent(r.url.replace("local-image://",""));console.log("Trying original path:",s),i.existsSync(s)?(console.log("Original path exists!"),n({path:s})):n({error:-6})}}catch(s){console.error("Error loading asset:",e,s),n({error:-2})}}),k(),g.on("activate",()=>{P.getAllWindows().length===0&&k()})});g.on("window-all-closed",()=>{process.platform!=="darwin"&&g.quit()});
+"use strict";
+const { app, BrowserWindow, ipcMain, screen, dialog, Menu, protocol } = require("electron");
+const path = require("path");
+const fs = require("fs");
+const { setupRemoteServer, broadcastStateUpdate, closeRemoteServer } = require("./remoteServer");
+console.log("Forcing X11/XWayland for Wayland compatibility");
+app.commandLine.appendSwitch("--ozone-platform=x11");
+app.commandLine.appendSwitch("--no-sandbox");
+app.commandLine.appendSwitch("--disable-setuid-sandbox");
+console.log("Using X11 mode with hardware acceleration enabled");
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "local-image",
+    privileges: {
+      secure: true,
+      supportFetchAPI: true,
+      bypassCSP: true,
+      stream: true
+    }
+  }
+]);
+let mainWindow = null;
+let projectorWindow = null;
+global.sendToMainWindow = (event, data) => {
+  if (mainWindow && mainWindow.webContents) {
+    mainWindow.webContents.send(event, data);
+  }
+};
+const isDev = !app.isPackaged;
+console.log("=================================");
+console.log("app.isPackaged:", app.isPackaged);
+console.log("Development mode:", isDev);
+console.log("process.env.NODE_ENV:", process.env.NODE_ENV);
+console.log("process.argv:", process.argv);
+console.log("=================================");
+if (isDev) {
+  app.commandLine.appendSwitch("--disable-features=OutOfBlinkCors");
+}
+function createMainWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1400,
+    height: 900,
+    frame: false,
+    // Frameless window for custom title bar
+    webPreferences: {
+      devTools: true,
+      preload: path.join(__dirname, "preload.js"),
+      nodeIntegration: false,
+      contextIsolation: true,
+      webSecurity: false,
+      allowRunningInsecureContent: true
+    },
+    title: "DongleControl Projector"
+  });
+  const template = [
+    {
+      label: "View",
+      submenu: [
+        { role: "reload" },
+        { role: "forceReload" },
+        { type: "separator" },
+        { role: "toggleDevTools" },
+        { type: "separator" },
+        { role: "resetZoom" },
+        { role: "zoomIn" },
+        { role: "zoomOut" }
+      ]
+    }
+  ];
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+  if (isDev) {
+    const vitePort = process.env.VITE_DEV_SERVER_URL || "http://localhost:5173";
+    console.log("Loading main window from:", vitePort);
+    mainWindow.loadURL(vitePort);
+  } else {
+    mainWindow.loadFile(path.join(__dirname, "../dist/index.html"));
+  }
+  mainWindow.webContents.on("did-finish-load", () => {
+    console.log("Main window finished loading");
+  });
+  mainWindow.webContents.on("did-fail-load", (event, errorCode, errorDescription) => {
+    console.error("Main window failed to load:", errorCode, errorDescription);
+  });
+  mainWindow.webContents.on("before-input-event", (event, input) => {
+    if (input.control && input.shift && input.key.toLowerCase() === "i") {
+      mainWindow.webContents.toggleDevTools();
+      event.preventDefault();
+    }
+    if (input.key === "F12") {
+      mainWindow.webContents.toggleDevTools();
+      event.preventDefault();
+    }
+  });
+  mainWindow.on("close", () => {
+    if (projectorWindow && !projectorWindow.isDestroyed()) {
+      projectorWindow.close();
+    }
+  });
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+    app.quit();
+  });
+}
+function createProjectorWindow(monitorIndex = null) {
+  console.log("=====================================");
+  console.log("Opening projector window (Wayland-compatible mode)");
+  console.log("Instructions:");
+  console.log("  1. Drag the window to your projector/display");
+  console.log("  2. Press F11 to toggle fullscreen");
+  console.log("  3. Press Escape to exit fullscreen");
+  console.log("=====================================");
+  projectorWindow = new BrowserWindow({
+    width: 1280,
+    height: 720,
+    frame: true,
+    // Keep frame so you can drag it
+    fullscreen: false,
+    skipTaskbar: false,
+    // Show in taskbar so it's easier to find
+    show: false,
+    alwaysOnTop: true,
+    backgroundColor: "#000000",
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, "preload.js"),
+      webSecurity: false,
+      allowRunningInsecureContent: true
+    },
+    title: "DongleControl Projector - Drag me to display, then press F11"
+  });
+  projectorWindow.once("ready-to-show", () => {
+    projectorWindow.show();
+    console.log("✓ Projector window opened");
+    console.log("📌 Drag it to your target display, then press F11 for fullscreen");
+  });
+  projectorWindow.webContents.on("before-input-event", (event, input) => {
+    if (input.key === "F11" && input.type === "keyDown") {
+      const isFullScreen = projectorWindow.isFullScreen();
+      projectorWindow.setFullScreen(!isFullScreen);
+      console.log(isFullScreen ? "📺 Exited fullscreen" : "📺 Entered fullscreen");
+      event.preventDefault();
+    }
+    if (input.key === "Escape" && input.type === "keyDown") {
+      if (projectorWindow.isFullScreen()) {
+        projectorWindow.setFullScreen(false);
+        console.log("📺 Exited fullscreen");
+        event.preventDefault();
+      }
+    }
+  });
+  if (isDev) {
+    const vitePort = process.env.VITE_DEV_SERVER_URL || "http://localhost:5173";
+    projectorWindow.loadURL(vitePort + "/projector");
+  } else {
+    projectorWindow.loadFile(path.join(__dirname, "../dist/index.html"), {
+      hash: "/projector"
+    });
+  }
+  projectorWindow.on("closed", () => {
+    projectorWindow = null;
+  });
+  return projectorWindow;
+}
+ipcMain.handle("get-available-monitors", () => {
+  const displays = screen.getAllDisplays();
+  console.log(`IPC: get-available-monitors returning ${displays.length} displays`);
+  const monitors = displays.map((display, index) => {
+    const isPrimary = display.id === screen.getPrimaryDisplay().id;
+    return `Monitor ${index + 1}${isPrimary ? " (Primary)" : ""} - ${display.bounds.width}x${display.bounds.height}`;
+  });
+  console.log("Available monitors:", monitors);
+  return monitors;
+});
+ipcMain.handle("open-projector-window", (event, monitorIndex) => {
+  if (projectorWindow) {
+    projectorWindow.focus();
+    return { success: true };
+  }
+  try {
+    createProjectorWindow(monitorIndex);
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to open projector:", error);
+    return { success: false, error: error.message };
+  }
+});
+ipcMain.handle("close-projector-window", () => {
+  if (projectorWindow) {
+    projectorWindow.close();
+    projectorWindow = null;
+  }
+  return { success: true };
+});
+ipcMain.handle("update-projector", (event, slideData) => {
+  console.log("Main: Received update-projector, data length:", slideData.length);
+  if (projectorWindow && !projectorWindow.isDestroyed()) {
+    console.log("Main: Sending to projector window");
+    projectorWindow.webContents.send("update-slide", slideData);
+    return { success: true };
+  } else {
+    console.log("Main: Projector window not available");
+    return { success: false, error: "Projector window not open" };
+  }
+});
+ipcMain.on("video-ended", () => {
+  console.log("Main: Video ended notification from projector, forwarding to control window");
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("video-ended-notification");
+  }
+});
+ipcMain.on("control-projector-video", (event, command, data) => {
+  console.log("Main: Video control command from control window:", command, data);
+  if (projectorWindow && !projectorWindow.isDestroyed()) {
+    projectorWindow.webContents.send("video-control-command", command, data);
+  }
+});
+ipcMain.on("video-state-update", (event, state) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("video-state-notification", state);
+  }
+});
+ipcMain.handle("window-minimize", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.minimize();
+  }
+});
+ipcMain.handle("window-maximize", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow.maximize();
+    }
+  }
+});
+ipcMain.handle("window-close", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.close();
+  }
+});
+ipcMain.handle("save-presentation", async (event, data) => {
+  try {
+    const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
+      title: "Save Presentation",
+      defaultPath: "presentation.json",
+      filters: [
+        { name: "JSON Files", extensions: ["json"] },
+        { name: "All Files", extensions: ["*"] }
+      ]
+    });
+    if (!canceled && filePath) {
+      fs.writeFileSync(filePath, data, "utf-8");
+      return { success: true, filePath };
+    }
+    return { success: false, canceled: true };
+  } catch (error) {
+    console.error("Save failed:", error);
+    return { success: false, error: error.message };
+  }
+});
+ipcMain.handle("load-presentation", async () => {
+  try {
+    const { filePaths, canceled } = await dialog.showOpenDialog(mainWindow, {
+      title: "Load Presentation",
+      filters: [
+        { name: "JSON Files", extensions: ["json"] },
+        { name: "All Files", extensions: ["*"] }
+      ],
+      properties: ["openFile"]
+    });
+    if (!canceled && filePaths.length > 0) {
+      const data = fs.readFileSync(filePaths[0], "utf-8");
+      return { success: true, data };
+    }
+    return { success: false, canceled: true };
+  } catch (error) {
+    console.error("Load failed:", error);
+    return { success: false, error: error.message };
+  }
+});
+ipcMain.handle("select-images", async () => {
+  try {
+    const { filePaths, canceled } = await dialog.showOpenDialog(mainWindow, {
+      title: "Select Images",
+      filters: [
+        { name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"] }
+      ],
+      properties: ["openFile", "multiSelections"]
+      // Allow multiple files
+    });
+    if (!canceled && filePaths.length > 0) {
+      return { success: true, files: filePaths };
+    }
+    return { success: false, canceled: true };
+  } catch (error) {
+    console.error("Image selection failed:", error);
+    return { success: false, error: error.message };
+  }
+});
+ipcMain.handle("create-library", async (event, parentPath, libraryName) => {
+  try {
+    const libraryPath = path.join(parentPath, `${libraryName}.dclib`);
+    fs.mkdirSync(libraryPath, { recursive: true });
+    fs.mkdirSync(path.join(libraryPath, "assets", "branding"), { recursive: true });
+    fs.mkdirSync(path.join(libraryPath, "assets", "media"), { recursive: true });
+    fs.mkdirSync(path.join(libraryPath, "assets", ".trash"), { recursive: true });
+    fs.mkdirSync(path.join(libraryPath, "events"), { recursive: true });
+    const metadata = {
+      name: libraryName,
+      created: (/* @__PURE__ */ new Date()).toISOString(),
+      version: "1.0",
+      lastOpened: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    fs.writeFileSync(
+      path.join(libraryPath, "library.json"),
+      JSON.stringify(metadata, null, 2),
+      "utf-8"
+    );
+    return libraryPath;
+  } catch (error) {
+    console.error("Create library failed:", error);
+    return null;
+  }
+});
+ipcMain.handle("load-library-metadata", async (event, libPath) => {
+  try {
+    const metadataPath = path.join(libPath, "library.json");
+    if (fs.existsSync(metadataPath)) {
+      const data = fs.readFileSync(metadataPath, "utf-8");
+      return JSON.parse(data);
+    }
+    return null;
+  } catch (error) {
+    console.error("Load library metadata failed:", error);
+    return null;
+  }
+});
+ipcMain.handle("save-library-metadata", async (event, libPath, metadata) => {
+  try {
+    const metadataPath = path.join(libPath, "library.json");
+    fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2), "utf-8");
+    return true;
+  } catch (error) {
+    console.error("Save library metadata failed:", error);
+    return false;
+  }
+});
+ipcMain.handle("list-library-events", async (event, libPath) => {
+  try {
+    const eventsPath = path.join(libPath, "events");
+    if (!fs.existsSync(eventsPath)) {
+      return [];
+    }
+    const files = fs.readdirSync(eventsPath);
+    return files.filter((f) => f.endsWith(".json")).map((f) => f.replace(".json", "")).sort();
+  } catch (error) {
+    console.error("List library events failed:", error);
+    return [];
+  }
+});
+ipcMain.handle("create-library-event", async (event, libPath, eventName) => {
+  try {
+    const eventPath = path.join(libPath, "events", `${eventName}.json`);
+    const emptyEvent = {
+      title: eventName,
+      stacks: []
+    };
+    fs.writeFileSync(eventPath, JSON.stringify(emptyEvent, null, 2), "utf-8");
+    return eventPath;
+  } catch (error) {
+    console.error("Create library event failed:", error);
+    return null;
+  }
+});
+ipcMain.handle("load-library-event", async (event, libPath, eventName) => {
+  try {
+    const eventPath = path.join(libPath, "events", `${eventName}.json`);
+    if (!fs.existsSync(eventPath)) {
+      return { success: false, error: "Event not found" };
+    }
+    const data = fs.readFileSync(eventPath, "utf-8");
+    return { success: true, data: JSON.parse(data), path: eventPath };
+  } catch (error) {
+    console.error("Load library event failed:", error);
+    return { success: false, error: error.message };
+  }
+});
+ipcMain.handle("save-library-event", async (event, eventPath, data) => {
+  try {
+    fs.writeFileSync(eventPath, JSON.stringify(data, null, 2), "utf-8");
+    return true;
+  } catch (error) {
+    console.error("Save library event failed:", error);
+    return false;
+  }
+});
+ipcMain.handle("delete-library-event", async (event, libPath, eventName) => {
+  try {
+    const eventPath = path.join(libPath, "events", `${eventName}.json`);
+    if (!fs.existsSync(eventPath)) {
+      return false;
+    }
+    fs.unlinkSync(eventPath);
+    return true;
+  } catch (error) {
+    console.error("Delete library event failed:", error);
+    return false;
+  }
+});
+ipcMain.handle("resolve-asset-path", async (event, libPath, assetUrl) => {
+  try {
+    if (assetUrl.startsWith("local-image://")) {
+      return assetUrl;
+    }
+    if (assetUrl.startsWith("file://")) {
+      let filePath = assetUrl.replace("file://", "");
+      if (process.platform === "win32" && filePath.startsWith("/")) {
+        filePath = filePath.substring(1);
+      }
+      return `local-image://${filePath}`;
+    }
+    if (!assetUrl.startsWith("assets://")) {
+      return assetUrl;
+    }
+    const relativePath = assetUrl.replace("assets://", "assets/");
+    const fullPath = path.join(libPath, relativePath);
+    if (fs.existsSync(fullPath)) {
+      const urlPath = process.platform === "win32" ? fullPath.replace(/\\/g, "/") : fullPath;
+      return `local-image://${urlPath}`;
+    }
+    const trashPath = fullPath.replace("/assets/", "/assets/.trash/");
+    if (fs.existsSync(trashPath)) {
+      return trashPath;
+    }
+    return null;
+  } catch (error) {
+    console.error("Resolve asset path failed:", error);
+    return null;
+  }
+});
+ipcMain.handle("select-library-folder", async () => {
+  try {
+    const { filePaths, canceled } = await dialog.showOpenDialog(mainWindow, {
+      title: "Select Library Folder",
+      properties: ["openDirectory"]
+    });
+    if (!canceled && filePaths.length > 0) {
+      return { success: true, path: filePaths[0] };
+    }
+    return { success: false, canceled: true };
+  } catch (error) {
+    console.error("Select library folder failed:", error);
+    return { success: false, error: error.message };
+  }
+});
+ipcMain.handle("list-library-assets", async (event, libPath) => {
+  try {
+    let scanDirectory2 = function(dirPath, urlPrefix) {
+      if (!fs.existsSync(dirPath)) return;
+      const items = fs.readdirSync(dirPath, { withFileTypes: true });
+      for (const item of items) {
+        if (item.isDirectory()) {
+          if (item.name === ".trash") continue;
+          const subPath = path.join(dirPath, item.name);
+          const subUrlPrefix = `${urlPrefix}${item.name}/`;
+          scanDirectory2(subPath, subUrlPrefix);
+        } else if (item.isFile()) {
+          const ext = item.name.split(".").pop().toLowerCase();
+          const assetPath = path.join(dirPath, item.name);
+          const assetUrl = `${urlPrefix}${item.name}`;
+          let assetType = null;
+          if (imageExtensions.includes(ext)) {
+            assetType = "image";
+          } else if (videoExtensions.includes(ext)) {
+            assetType = "video";
+          }
+          if (assetType) {
+            assets.push({
+              filename: item.name,
+              path: assetPath,
+              url: assetUrl,
+              type: assetType
+            });
+          }
+        }
+      }
+    };
+    var scanDirectory = scanDirectory2;
+    if (!libPath) {
+      return { success: false, assets: [] };
+    }
+    const assets = [];
+    const imageExtensions = ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"];
+    const videoExtensions = ["mp4", "webm", "ogg", "mov", "avi", "mkv"];
+    const brandingPath = path.join(libPath, "assets", "branding");
+    scanDirectory2(brandingPath, "assets://branding/");
+    const mediaPath = path.join(libPath, "assets", "media");
+    scanDirectory2(mediaPath, "assets://media/");
+    return { success: true, assets };
+  } catch (error) {
+    console.error("List library assets failed:", error);
+    return { success: false, assets: [], error: error.message };
+  }
+});
+ipcMain.handle("import-assets-to-library", async (event, libPath, assetType) => {
+  try {
+    if (!libPath) {
+      return { success: false, error: "No library open" };
+    }
+    let filters = [];
+    if (assetType === "image") {
+      filters = [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"] }];
+    } else if (assetType === "video") {
+      filters = [{ name: "Videos", extensions: ["mp4", "webm", "ogg", "mov", "avi", "mkv"] }];
+    } else {
+      filters = [
+        { name: "Media Files", extensions: ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "mp4", "webm", "ogg", "mov", "avi", "mkv"] }
+      ];
+    }
+    const { filePaths, canceled } = await dialog.showOpenDialog(mainWindow, {
+      title: "Import Assets",
+      filters,
+      properties: ["openFile", "multiSelections"]
+    });
+    if (canceled || filePaths.length === 0) {
+      return { success: false, canceled: true };
+    }
+    const now = /* @__PURE__ */ new Date();
+    const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const targetDir = path.join(libPath, "assets", "media", yearMonth);
+    fs.mkdirSync(targetDir, { recursive: true });
+    const importedAssets = [];
+    const imageExtensions = ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"];
+    const videoExtensions = ["mp4", "webm", "ogg", "mov", "avi", "mkv"];
+    for (const sourcePath of filePaths) {
+      const filename = path.basename(sourcePath);
+      const targetPath = path.join(targetDir, filename);
+      fs.copyFileSync(sourcePath, targetPath);
+      const ext = filename.split(".").pop().toLowerCase();
+      let type = "unknown";
+      if (imageExtensions.includes(ext)) {
+        type = "image";
+      } else if (videoExtensions.includes(ext)) {
+        type = "video";
+      }
+      const assetUrl = `assets://media/${yearMonth}/${filename}`;
+      importedAssets.push({
+        filename,
+        path: targetPath,
+        url: assetUrl,
+        type
+      });
+    }
+    return { success: true, assets: importedAssets };
+  } catch (error) {
+    console.error("Import assets failed:", error);
+    return { success: false, error: error.message };
+  }
+});
+ipcMain.handle("check-asset-usage", async (event, libPath, assetUrl) => {
+  try {
+    if (!libPath || !assetUrl) {
+      return [];
+    }
+    const eventsDir = path.join(libPath, "events");
+    if (!fs.existsSync(eventsDir)) {
+      return [];
+    }
+    const eventFiles = fs.readdirSync(eventsDir).filter((f) => f.endsWith(".json"));
+    const usageList = [];
+    for (const eventFile of eventFiles) {
+      const eventPath = path.join(eventsDir, eventFile);
+      try {
+        const content = fs.readFileSync(eventPath, "utf-8");
+        if (content.includes(assetUrl)) {
+          const eventName = eventFile.replace(".json", "");
+          usageList.push(eventName);
+        }
+      } catch (error) {
+        console.error(`Error reading event file ${eventFile}:`, error);
+      }
+    }
+    return usageList;
+  } catch (error) {
+    console.error("Check asset usage failed:", error);
+    return [];
+  }
+});
+ipcMain.handle("delete-library-asset", async (event, libPath, assetPath) => {
+  try {
+    if (!libPath || !assetPath) {
+      return { success: false, error: "Invalid parameters" };
+    }
+    if (!assetPath.startsWith(libPath)) {
+      return { success: false, error: "Asset path is not within library" };
+    }
+    if (!fs.existsSync(assetPath)) {
+      return { success: false, error: "Asset file not found" };
+    }
+    fs.unlinkSync(assetPath);
+    console.log("Asset deleted:", assetPath);
+    return { success: true };
+  } catch (error) {
+    console.error("Delete asset failed:", error);
+    return { success: false, error: error.message };
+  }
+});
+ipcMain.handle("broadcast-presentation-state", async (event, state) => {
+  broadcastStateUpdate(state);
+  return { success: true };
+});
+function sendLogToRenderer(message) {
+  if (mainWindow && mainWindow.webContents) {
+    mainWindow.webContents.send("main-process-log", message);
+  }
+}
+app.whenReady().then(() => {
+  protocol.registerFileProtocol("local-image", (request, callback) => {
+    const logMsg = `local-image protocol request: ${request.url}`;
+    console.log(logMsg);
+    sendLogToRenderer(logMsg);
+    let filePath = decodeURIComponent(request.url.replace("local-image://", ""));
+    sendLogToRenderer(`After removing protocol: ${filePath}`);
+    if (process.platform === "win32" && filePath.match(/^\/[A-Za-z]:/)) {
+      filePath = filePath.substring(1);
+      sendLogToRenderer(`After removing leading slash: ${filePath}`);
+    }
+    if (process.platform === "win32") {
+      filePath = filePath.replace(/\//g, "\\");
+      sendLogToRenderer(`After converting slashes: ${filePath}`);
+      if (!filePath.match(/^[A-Za-z]:\\/)) {
+        sendLogToRenderer(`WARNING: Path missing colon after drive letter: ${filePath}`);
+        filePath = filePath.replace(/^([A-Za-z])\\/, "$1:\\");
+        sendLogToRenderer(`Fixed path: ${filePath}`);
+      }
+    }
+    try {
+      sendLogToRenderer(`Checking if file exists: ${filePath}`);
+      if (fs.existsSync(filePath)) {
+        sendLogToRenderer(`File exists! Returning path: ${filePath}`);
+        const stats = fs.statSync(filePath);
+        const ext = path.extname(filePath).toLowerCase();
+        const mimeTypes = {
+          ".mp4": "video/mp4",
+          ".webm": "video/webm",
+          ".ogg": "video/ogg",
+          ".png": "image/png",
+          ".jpg": "image/jpeg",
+          ".jpeg": "image/jpeg",
+          ".gif": "image/gif",
+          ".webp": "image/webp"
+        };
+        const mimeType = mimeTypes[ext];
+        if (mimeType) {
+          callback({
+            path: filePath,
+            headers: {
+              "Content-Type": mimeType,
+              "Accept-Ranges": "bytes",
+              // Enable aggressive browser caching - cache for 1 year
+              "Cache-Control": "public, max-age=31536000, immutable",
+              // Use file modification time as ETag for cache validation
+              "ETag": `"${stats.mtime.getTime()}-${stats.size}"`,
+              "Last-Modified": stats.mtime.toUTCString()
+            }
+          });
+        } else {
+          console.log("Returning path to callback:", filePath);
+          callback({ path: filePath });
+        }
+      } else {
+        console.error("Asset file not found:", filePath);
+        const originalPath = decodeURIComponent(request.url.replace("local-image://", ""));
+        console.log("Trying original path:", originalPath);
+        if (fs.existsSync(originalPath)) {
+          console.log("Original path exists!");
+          callback({ path: originalPath });
+        } else {
+          callback({ error: -6 });
+        }
+      }
+    } catch (error) {
+      console.error("Error loading asset:", filePath, error);
+      callback({ error: -2 });
+    }
+  });
+  createMainWindow();
+  setupRemoteServer(3777);
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createMainWindow();
+    }
+  });
+});
+app.on("window-all-closed", () => {
+  closeRemoteServer();
+  if (process.platform !== "darwin") {
+    app.quit();
+  }
+});
+app.on("before-quit", () => {
+  closeRemoteServer();
+});

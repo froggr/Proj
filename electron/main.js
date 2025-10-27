@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, screen, dialog, Menu, protocol } = require('electron')
 const path = require('path')
 const fs = require('fs')
+const { setupRemoteServer, broadcastStateUpdate, closeRemoteServer } = require('./remoteServer')
 
 // Force X11 instead of Wayland for better compatibility (especially with Cosmic DE)
 console.log('Forcing X11/XWayland for Wayland compatibility')
@@ -28,6 +29,13 @@ protocol.registerSchemesAsPrivileged([
 // Keep references to windows to prevent garbage collection
 let mainWindow = null
 let projectorWindow = null
+
+// Setup global function for remote server to send events to main window
+global.sendToMainWindow = (event, data) => {
+  if (mainWindow && mainWindow.webContents) {
+    mainWindow.webContents.send(event, data)
+  }
+}
 
 // Determine if we're in development mode
 const isDev = !app.isPackaged
@@ -757,6 +765,13 @@ ipcMain.handle('delete-library-asset', async (event, libPath, assetPath) => {
   }
 })
 
+// Remote control IPC handlers
+ipcMain.handle('broadcast-presentation-state', async (event, state) => {
+  // Broadcast state to all connected remote clients
+  broadcastStateUpdate(state)
+  return { success: true }
+})
+
 // Helper to send logs to renderer
 function sendLogToRenderer(message) {
   if (mainWindow && mainWindow.webContents) {
@@ -861,6 +876,9 @@ app.whenReady().then(() => {
 
   createMainWindow()
 
+  // Start remote control server
+  setupRemoteServer(3777)
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createMainWindow()
@@ -869,7 +887,12 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
+  closeRemoteServer()
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+app.on('before-quit', () => {
+  closeRemoteServer()
 })

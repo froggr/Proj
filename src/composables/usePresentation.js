@@ -88,6 +88,81 @@ export function usePresentation() {
         handleAutoAdvance(newStackIndex, newSlideIndex)
       }
     }, { flush: 'post' })
+
+    // Watch for any state changes and broadcast to remote clients
+    watch([stacks, stagedStackIndex, stagedSlideIndex, liveStackIndex, liveSlideIndex], () => {
+      broadcastStateToRemote()
+    }, { deep: true })
+
+    // Listen for remote control commands
+    if (window.electronAPI?.onRemoteCommand) {
+      window.electronAPI.onRemoteCommand((event, data) => {
+        console.log('Remote command received:', event, data)
+        handleRemoteCommand(event, data)
+      })
+    }
+  }
+
+  // Broadcast presentation state to remote clients
+  function broadcastStateToRemote() {
+    if (!window.electronAPI?.broadcastPresentationState) return
+
+    const state = {
+      stacks: stacks.value.map(stack => ({
+        id: stack.id,
+        title: stack.title,
+        slideCount: stack.slides.length,
+        slides: stack.slides.map(slide => ({
+          type: slide.type,
+          title: slide.title || `${slide.type} slide`
+        }))
+      })),
+      staged: {
+        stackIndex: stagedStackIndex.value,
+        slideIndex: stagedSlideIndex.value,
+        stackTitle: stacks.value[stagedStackIndex.value]?.title,
+        slideTitle: stacks.value[stagedStackIndex.value]?.slides[stagedSlideIndex.value]?.title
+      },
+      live: {
+        stackIndex: liveStackIndex.value,
+        slideIndex: liveSlideIndex.value,
+        stackTitle: liveStackIndex.value !== null ? stacks.value[liveStackIndex.value]?.title : null,
+        slideTitle: liveStackIndex.value !== null && liveSlideIndex.value !== null
+          ? stacks.value[liveStackIndex.value]?.slides[liveSlideIndex.value]?.title
+          : null
+      }
+    }
+
+    window.electronAPI.broadcastPresentationState(state)
+  }
+
+  // Handle remote control commands
+  function handleRemoteCommand(event, data) {
+    switch (event) {
+      case 'remote-stage-next':
+        nextSlide()
+        break
+      case 'remote-stage-prev':
+        prevSlide()
+        break
+      case 'remote-go-live':
+        goLive()
+        break
+      case 'remote-clear':
+        clearProjection()
+        break
+      case 'remote-stage-slide':
+        if (data?.stackIndex !== undefined && data?.slideIndex !== undefined) {
+          stageSlideInStack(data.stackIndex, data.slideIndex)
+        }
+        break
+      case 'remote-next-stack':
+        nextStack()
+        break
+      case 'remote-prev-stack':
+        prevStack()
+        break
+    }
   }
 
   // Computed values

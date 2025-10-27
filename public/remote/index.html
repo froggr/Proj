@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>DCProjector Remote</title>
+  <link rel="stylesheet" href="remote.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="logo-container">
+        <img src="logo.svg" alt="DongleControl" class="logo">
+      </div>
+      <h1>Remote Control</h1>
+      <div class="connection-status">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Connecting...</span>
+      </div>
+    </header>
+
+    <!-- State Display -->
+    <div class="state-display">
+      <div class="state-section">
+        <div class="state-label">STAGED</div>
+        <div class="state-content" id="stagedContent">
+          <div class="state-stack">—</div>
+          <div class="state-slide">—</div>
+        </div>
+      </div>
+      <div class="state-section live">
+        <div class="state-label">LIVE</div>
+        <div class="state-content" id="liveContent">
+          <div class="state-stack">—</div>
+          <div class="state-slide">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Primary Controls -->
+    <div class="controls-primary">
+      <button class="btn-large btn-golive" id="btnGoLive">
+        <span class="btn-icon">▶</span>
+        <span class="btn-text">GO LIVE</span>
+      </button>
+      <button class="btn-large btn-clear" id="btnClear">
+        <span class="btn-icon">⏹</span>
+        <span class="btn-text">CLEAR</span>
+      </button>
+    </div>
+
+    <!-- Navigation Controls -->
+    <div class="controls-nav">
+      <div class="nav-group">
+        <div class="nav-label">STAGE</div>
+        <div class="nav-buttons">
+          <button class="btn-nav" id="btnStagePrev">
+            <span>◀</span>
+          </button>
+          <button class="btn-nav" id="btnStageNext">
+            <span>▶</span>
+          </button>
+        </div>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">STACK</div>
+        <div class="nav-buttons">
+          <button class="btn-nav" id="btnStackPrev">
+            <span>◀</span>
+          </button>
+          <button class="btn-nav" id="btnStackNext">
+            <span>▶</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <div class="info-text">Read-only control • No editing</div>
+    </footer>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="remote.js"></script>
+</body>
+</html>
