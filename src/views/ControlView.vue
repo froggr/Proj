@@ -48,8 +48,8 @@
     <div class="px-6 py-2 flex items-center justify-between border-b border-neutral-800 bg-neutral-900/50 backdrop-blur relative z-50" style="flex-shrink: 0;">
       <div class="flex items-center gap-4">
         <div class="flex gap-2">
-          <!-- File menu (for library management) -->
-          <div class="relative z-[200]">
+          <!-- File menu (consolidated event and library management) -->
+          <div class="relative z-[200] file-menu-container">
             <button
               @click="showFileMenu = !showFileMenu"
               class="px-3 py-1.5 text-xs font-medium text-neutral-400 hover:text-gold-500 hover:bg-neutral-800 rounded-lg transition-all flex items-center gap-1"
@@ -59,7 +59,37 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
               </svg>
             </button>
-            <div v-if="showFileMenu" class="absolute top-full left-0 mt-1 bg-neutral-800 border border-neutral-700 rounded-lg shadow-xl py-1 min-w-[160px] z-[200]">
+            <div v-if="showFileMenu" class="absolute top-full left-0 mt-1 bg-neutral-800 border border-neutral-700 rounded-lg shadow-xl py-1 min-w-[180px] z-[200]">
+              <!-- Event Management -->
+              <button
+                @click="newPresentation(); showFileMenu = false"
+                :disabled="!isLibraryOpen"
+                class="w-full px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-700 hover:text-gold-500 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                :title="!isLibraryOpen ? 'Open a library first' : ''"
+              >
+                New Event...
+              </button>
+              <button
+                @click="showSelectEventDialog = true; showFileMenu = false"
+                :disabled="!isLibraryOpen"
+                class="w-full px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-700 hover:text-gold-500 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                :title="!isLibraryOpen ? 'Open a library first' : ''"
+              >
+                Load Event...
+              </button>
+              <button
+                @click="savePresentation(); showFileMenu = false"
+                :disabled="!isLibraryOpen || !currentEventName"
+                class="w-full px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-700 hover:text-gold-500 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                :title="!isLibraryOpen ? 'Open a library first' : !currentEventName ? 'No event open' : ''"
+              >
+                Save Event
+              </button>
+
+              <!-- Separator -->
+              <div class="border-t border-neutral-700 my-1"></div>
+
+              <!-- Library Management -->
               <button
                 @click="showNewLibraryDialog = true; showFileMenu = false"
                 class="w-full px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-700 hover:text-gold-500 transition-all text-left"
@@ -79,7 +109,6 @@
               >
                 Library Manager...
               </button>
-              <div v-if="isLibraryOpen" class="border-t border-neutral-700 my-1"></div>
               <button
                 v-if="isLibraryOpen"
                 @click="handleCloseLibrary(); showFileMenu = false"
@@ -87,35 +116,19 @@
               >
                 Close Library
               </button>
+
+              <!-- Separator -->
+              <div class="border-t border-neutral-700 my-1"></div>
+
+              <!-- Quit -->
+              <button
+                @click="quitApp(); showFileMenu = false"
+                class="w-full px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-700 hover:text-gold-500 transition-all text-left"
+              >
+                Quit
+              </button>
             </div>
           </div>
-
-          <!-- New Event (simple button) -->
-          <button
-            @click="newPresentation()"
-            :disabled="!isLibraryOpen"
-            class="px-3 py-1.5 text-xs font-medium text-neutral-400 hover:text-gold-500 hover:bg-neutral-800 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            :title="!isLibraryOpen ? 'Open a library first' : 'Create new event'"
-          >
-            New
-          </button>
-
-          <!-- Load Event (simple button) -->
-          <button
-            @click="showSelectEventDialog = true"
-            :disabled="!isLibraryOpen"
-            class="px-3 py-1.5 text-xs font-medium text-neutral-400 hover:text-gold-500 hover:bg-neutral-800 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            :title="!isLibraryOpen ? 'Open a library first' : 'Load an event'"
-          >
-            Load
-          </button>
-
-          <button
-            @click="savePresentation"
-            class="px-3 py-1.5 text-xs font-medium text-neutral-400 hover:text-gold-500 hover:bg-neutral-800 rounded-lg transition-all"
-          >
-            Save
-          </button>
         </div>
 
         <!-- Library/Event Status Indicator -->
@@ -131,7 +144,7 @@
 
       <div class="flex items-center gap-4">
         <!-- Display Settings Dropdown -->
-        <div class="relative z-[200]">
+        <div class="relative z-[200] display-settings-container">
           <button
             @click="showDisplaySettings = !showDisplaySettings"
             class="px-3 py-1.5 text-xs font-medium text-neutral-300 hover:text-gold-500 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 rounded-lg transition-all flex items-center gap-2"
@@ -839,6 +852,8 @@ const {
   goLive,
   nextSlide,
   prevSlide,
+  nextStack,
+  prevStack,
   clearProjection,
   stageStack,
   stageSlideInStack,
@@ -1402,12 +1417,12 @@ function handleAssetDeleted(asset) {
   // - Check if current event uses the asset and warn user
 }
 
-function handleCloseLibrary() {
+async function handleCloseLibrary() {
   // Clear all stacks and projections
   stacks.value = []
   clearProjection()
   // Close the library
-  closeLibrary()
+  await closeLibrary()
   console.log('Library closed, stacks cleared')
 }
 
@@ -1469,7 +1484,14 @@ useKeyboard({
   onSpace: goLive,
   onArrowLeft: prevSlide,
   onArrowRight: nextSlide,
-  onEscape: clearProjection
+  onArrowUp: prevStack,
+  onArrowDown: nextStack,
+  onEscape: clearProjection,
+  onQuit: () => {
+    if (window.electronAPI && window.electronAPI.windowClose) {
+      window.electronAPI.windowClose()
+    }
+  }
 })
 
 // Window control functions
@@ -1486,6 +1508,12 @@ function maximizeWindow() {
 }
 
 function closeWindow() {
+  if (window.electronAPI && window.electronAPI.windowClose) {
+    window.electronAPI.windowClose()
+  }
+}
+
+function quitApp() {
   if (window.electronAPI && window.electronAPI.windowClose) {
     window.electronAPI.windowClose()
   }
@@ -1557,14 +1585,16 @@ watch(
   { deep: true }
 )
 
-// Watch textScale and save to localStorage
+// Watch textScale and save to electron-store
 watch(
   () => textScale.value,
-  (newScale) => {
+  async (newScale) => {
     try {
-      localStorage.setItem('dc_textScale', newScale.toString())
+      if (window.electronAPI?.settingsSet) {
+        await window.electronAPI.settingsSet('textScale', newScale)
+      }
     } catch (e) {
-      console.warn('Failed to save text scale to localStorage:', e)
+      console.warn('Failed to save text scale:', e)
     }
   }
 )
@@ -1578,20 +1608,37 @@ watch(
   { immediate: true }
 )
 
+// Click-outside handler for dropdowns
+function handleClickOutside(event) {
+  // Close File menu if clicking outside
+  const fileMenuButton = event.target.closest('.file-menu-container')
+  if (!fileMenuButton && showFileMenu.value) {
+    showFileMenu.value = false
+  }
+
+  // Close Display settings if clicking outside
+  const displaySettingsButton = event.target.closest('.display-settings-container')
+  if (!displaySettingsButton && showDisplaySettings.value) {
+    showDisplaySettings.value = false
+  }
+}
+
 // Listen for video completion events from projector window
 onMounted(async () => {
-  // Load text scale from localStorage
+  // Load text scale from electron-store
   try {
-    const savedTextScale = localStorage.getItem('dc_textScale')
-    if (savedTextScale) {
-      textScale.value = parseInt(savedTextScale, 10)
+    if (window.electronAPI?.settingsGet) {
+      const savedTextScale = await window.electronAPI.settingsGet('textScale')
+      if (savedTextScale) {
+        textScale.value = savedTextScale
+      }
     }
   } catch (e) {
-    console.warn('Failed to load text scale from localStorage:', e)
+    console.warn('Failed to load text scale:', e)
   }
 
   // Auto-open last library if one exists
-  const lastLibraryPath = getLastLibraryPath()
+  const lastLibraryPath = await getLastLibraryPath()
   if (lastLibraryPath) {
     console.log('Auto-opening last library:', lastLibraryPath)
     const result = await openLibrary(lastLibraryPath)
@@ -1601,9 +1648,11 @@ onMounted(async () => {
       showSelectEventDialog.value = true
     } else {
       console.warn('Failed to auto-open last library:', result.error)
-      // Clear invalid path from localStorage
+      // Clear invalid path from settings store
       try {
-        localStorage.removeItem('dc_lastLibraryPath')
+        if (window.electronAPI?.settingsDelete) {
+          await window.electronAPI.settingsDelete('lastLibraryPath')
+        }
       } catch (e) {
         console.warn('Failed to clear invalid library path:', e)
       }
@@ -1619,6 +1668,14 @@ onMounted(async () => {
   } else {
     console.log('ControlView: onVideoEnded not available (preload script may need rebuild)')
   }
+
+  // Add click-outside handler for dropdown menus
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  // Clean up click-outside handler
+  document.removeEventListener('click', handleClickOutside)
 })
 </script>
 

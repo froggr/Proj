@@ -301,20 +301,24 @@ const mode = ref('api')
 // API mode fields
 const apiKey = ref('')
 
-// Load API key from localStorage on mount
-onMounted(() => {
-  const savedKey = localStorage.getItem('bible-api-key')
-  if (savedKey) {
-    apiKey.value = savedKey
+// Load API key from electron-store on mount
+onMounted(async () => {
+  if (window.electronAPI?.settingsGet) {
+    const savedKey = await window.electronAPI.settingsGet('bibleApiKey')
+    if (savedKey) {
+      apiKey.value = savedKey
+    }
   }
 })
 
-// Save API key to localStorage when it changes
-watch(apiKey, (newKey) => {
-  if (newKey) {
-    localStorage.setItem('bible-api-key', newKey)
-  } else {
-    localStorage.removeItem('bible-api-key')
+// Save API key to electron-store when it changes
+watch(apiKey, async (newKey) => {
+  if (window.electronAPI) {
+    if (newKey) {
+      await window.electronAPI.settingsSet('bibleApiKey', newKey)
+    } else {
+      await window.electronAPI.settingsDelete('bibleApiKey')
+    }
   }
 })
 const book = ref('')

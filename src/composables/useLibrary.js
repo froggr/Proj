@@ -33,11 +33,13 @@ export function useLibrary() {
           lastOpened: new Date().toISOString()
         }
 
-        // Save to localStorage for auto-open on next launch
+        // Save to electron-store for auto-open on next launch
         try {
-          localStorage.setItem(LAST_LIBRARY_KEY, libraryPath)
+          if (window.electronAPI?.settingsSet) {
+            await window.electronAPI.settingsSet('lastLibraryPath', libraryPath)
+          }
         } catch (e) {
-          console.warn('Failed to save library path to localStorage:', e)
+          console.warn('Failed to save library path:', e)
         }
 
         return { success: true, path: libraryPath }
@@ -71,11 +73,13 @@ export function useLibrary() {
         metadata.lastOpened = new Date().toISOString()
         await window.electronAPI.saveLibraryMetadata(libPath, metadata)
 
-        // Save to localStorage for auto-open on next launch
+        // Save to electron-store for auto-open on next launch
         try {
-          localStorage.setItem(LAST_LIBRARY_KEY, libPath)
+          if (window.electronAPI?.settingsSet) {
+            await window.electronAPI.settingsSet('lastLibraryPath', libPath)
+          }
         } catch (e) {
-          console.warn('Failed to save library path to localStorage:', e)
+          console.warn('Failed to save library path:', e)
         }
 
         return { success: true }
@@ -91,17 +95,19 @@ export function useLibrary() {
   /**
    * Close the current library
    */
-  function closeLibrary() {
+  async function closeLibrary() {
     libraryRoot.value = null
     libraryMetadata.value = null
     currentEventPath.value = null
     currentEventName.value = null
 
-    // Clear from localStorage
+    // Clear from electron-store
     try {
-      localStorage.removeItem(LAST_LIBRARY_KEY)
+      if (window.electronAPI?.settingsDelete) {
+        await window.electronAPI.settingsDelete('lastLibraryPath')
+      }
     } catch (e) {
-      console.warn('Failed to clear library path from localStorage:', e)
+      console.warn('Failed to clear library path:', e)
     }
   }
 
@@ -257,14 +263,17 @@ export function useLibrary() {
   }
 
   /**
-   * Get the last opened library path from localStorage
-   * @returns {string|null} Library path or null if none saved
+   * Get the last opened library path from electron-store
+   * @returns {Promise<string|null>} Library path or null if none saved
    */
-  function getLastLibraryPath() {
+  async function getLastLibraryPath() {
     try {
-      return localStorage.getItem(LAST_LIBRARY_KEY)
+      if (window.electronAPI?.settingsGet) {
+        return await window.electronAPI.settingsGet('lastLibraryPath')
+      }
+      return null
     } catch (e) {
-      console.warn('Failed to get last library path from localStorage:', e)
+      console.warn('Failed to get last library path:', e)
       return null
     }
   }

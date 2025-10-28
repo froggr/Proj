@@ -53,6 +53,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   windowMinimize: () => ipcRenderer.invoke("window-minimize"),
   windowMaximize: () => ipcRenderer.invoke("window-maximize"),
   windowClose: () => ipcRenderer.invoke("window-close"),
+  // Settings (electron-store - persists to disk, survives dev rebuilds)
+  settingsGet: (key) => ipcRenderer.invoke("settings-get", key),
+  settingsSet: (key, value) => ipcRenderer.invoke("settings-set", key, value),
+  settingsDelete: (key) => ipcRenderer.invoke("settings-delete", key),
   // Library management
   createLibrary: (parentPath, libraryName) => ipcRenderer.invoke("create-library", parentPath, libraryName),
   loadLibraryMetadata: (libPath) => ipcRenderer.invoke("load-library-metadata", libPath),

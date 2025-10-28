@@ -3,6 +3,23 @@ const path = require('path')
 const fs = require('fs')
 const { setupRemoteServer, broadcastStateUpdate, closeRemoteServer } = require('./remoteServer')
 
+// Settings store will be initialized asynchronously (ESM module)
+let settingsStore = null
+
+// Initialize settings store (persists to disk, survives dev rebuilds)
+async function initializeStore() {
+  const Store = (await import('electron-store')).default
+  settingsStore = new Store({
+    name: 'settings',
+    defaults: {
+      textScale: 100,
+      lastLibraryPath: null,
+      bibleApiKey: null
+    }
+  })
+  console.log('Settings store initialized')
+}
+
 // Force X11 instead of Wayland for better compatibility (especially with Cosmic DE)
 console.log('Forcing X11/XWayland for Wayland compatibility')
 app.commandLine.appendSwitch('--ozone-platform=x11')
@@ -60,6 +77,21 @@ function setupApplicationMenu() {
       label: 'File',
       submenu: [
         isMac ? { role: 'close' } : { role: 'quit' }
+      ]
+    },
+    // Edit menu (CRITICAL for copy/paste!)
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'pasteAndMatchStyle' },
+        { role: 'delete' },
+        { role: 'selectAll' }
       ]
     },
     // View menu
@@ -134,24 +166,7 @@ function createMainWindow() {
     title: 'DCProjector'
   })
 
-  // Create application menu with dev tools
-  const template = [
-    {
-      label: 'View',
-      submenu: [
-        { role: 'reload' },
-        { role: 'forceReload' },
-        { type: 'separator' },
-        { role: 'toggleDevTools' },
-        { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' }
-      ]
-    }
-  ]
-  const menu = Menu.buildFromTemplate(template)
-  Menu.setApplicationMenu(menu)
+  // Note: Application menu is set up in setupApplicationMenu() - don't override it here!
 
   if (isDev) {
     // Use environment variable for Vite port, fallback to 5173
@@ -363,6 +378,33 @@ ipcMain.handle('window-close', () => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.close()
   }
+})
+
+// Settings store handlers (electron-store persists to disk)
+ipcMain.handle('settings-get', (event, key) => {
+  if (!settingsStore) {
+    console.warn('Settings store not initialized yet')
+    return null
+  }
+  return settingsStore.get(key)
+})
+
+ipcMain.handle('settings-set', (event, key, value) => {
+  if (!settingsStore) {
+    console.warn('Settings store not initialized yet')
+    return false
+  }
+  settingsStore.set(key, value)
+  return true
+})
+
+ipcMain.handle('settings-delete', (event, key) => {
+  if (!settingsStore) {
+    console.warn('Settings store not initialized yet')
+    return false
+  }
+  settingsStore.delete(key)
+  return true
 })
 
 // File dialog handlers
@@ -1025,7 +1067,10 @@ function sendLogToRenderer(message) {
 app.setName('DCProjector')
 
 // App lifecycle
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // Initialize settings store first (ESM module)
+  await initializeStore()
+
   setupApplicationMenu()
 
   // Register custom protocol for loading local images and videos

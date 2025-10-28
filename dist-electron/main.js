@@ -3,6 +3,19 @@ const { app, BrowserWindow, ipcMain, screen, dialog, Menu, protocol } = require(
 const path = require("path");
 const fs = require("fs");
 const { setupRemoteServer, broadcastStateUpdate, closeRemoteServer } = require("./remoteServer");
+let settingsStore = null;
+async function initializeStore() {
+  const Store = (await Promise.resolve().then(() => require("./index-eZZZsljb.js"))).default;
+  settingsStore = new Store({
+    name: "settings",
+    defaults: {
+      textScale: 100,
+      lastLibraryPath: null,
+      bibleApiKey: null
+    }
+  });
+  console.log("Settings store initialized");
+}
 console.log("Forcing X11/XWayland for Wayland compatibility");
 app.commandLine.appendSwitch("--ozone-platform=x11");
 app.commandLine.appendSwitch("--no-sandbox");
@@ -47,6 +60,21 @@ function setupApplicationMenu() {
       label: "File",
       submenu: [
         isMac ? { role: "close" } : { role: "quit" }
+      ]
+    },
+    // Edit menu (CRITICAL for copy/paste!)
+    {
+      label: "Edit",
+      submenu: [
+        { role: "undo" },
+        { role: "redo" },
+        { type: "separator" },
+        { role: "cut" },
+        { role: "copy" },
+        { role: "paste" },
+        { role: "pasteAndMatchStyle" },
+        { role: "delete" },
+        { role: "selectAll" }
       ]
     },
     // View menu
@@ -115,23 +143,6 @@ function createMainWindow() {
     },
     title: "DCProjector"
   });
-  const template = [
-    {
-      label: "View",
-      submenu: [
-        { role: "reload" },
-        { role: "forceReload" },
-        { type: "separator" },
-        { role: "toggleDevTools" },
-        { type: "separator" },
-        { role: "resetZoom" },
-        { role: "zoomIn" },
-        { role: "zoomOut" }
-      ]
-    }
-  ];
-  const menu = Menu.buildFromTemplate(template);
-  Menu.setApplicationMenu(menu);
   if (isDev) {
     const vitePort = process.env.VITE_DEV_SERVER_URL || "http://localhost:5173";
     console.log("Loading main window from:", vitePort);
@@ -303,6 +314,29 @@ ipcMain.handle("window-close", () => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.close();
   }
+});
+ipcMain.handle("settings-get", (event, key) => {
+  if (!settingsStore) {
+    console.warn("Settings store not initialized yet");
+    return null;
+  }
+  return settingsStore.get(key);
+});
+ipcMain.handle("settings-set", (event, key, value) => {
+  if (!settingsStore) {
+    console.warn("Settings store not initialized yet");
+    return false;
+  }
+  settingsStore.set(key, value);
+  return true;
+});
+ipcMain.handle("settings-delete", (event, key) => {
+  if (!settingsStore) {
+    console.warn("Settings store not initialized yet");
+    return false;
+  }
+  settingsStore.delete(key);
+  return true;
 });
 ipcMain.handle("save-presentation", async (event, data) => {
   try {
@@ -800,7 +834,8 @@ function sendLogToRenderer(message) {
   }
 }
 app.setName("DCProjector");
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await initializeStore();
   setupApplicationMenu();
   protocol.registerFileProtocol("local-image", (request, callback) => {
     const logMsg = `local-image protocol request: ${request.url}`;
