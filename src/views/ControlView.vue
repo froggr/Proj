@@ -195,8 +195,9 @@
     <!-- Main Content Area -->
     <div class="flex-1 flex p-4 gap-4 min-h-0 relative">
       <!-- Left Sidebar: Stacks -->
-      <div class="w-56 bg-neutral-900/50 backdrop-blur rounded-xl border border-neutral-800 p-3 overflow-y-auto flex flex-col">
-        <div class="flex items-center justify-between mb-3">
+      <div class="w-72 bg-neutral-900/50 backdrop-blur rounded-xl border border-neutral-800 flex flex-col overflow-hidden">
+        <!-- Sticky Header -->
+        <div class="flex items-center justify-between p-3 pb-2 bg-neutral-900/50 backdrop-blur border-b border-neutral-800/50 flex-shrink-0">
           <h2 class="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Stacks</h2>
           <button
             @click="addNewStack"
@@ -210,8 +211,8 @@
           </button>
         </div>
 
-        <!-- Stacks List -->
-        <div class="space-y-1 flex-1">
+        <!-- Stacks List (scrollable) -->
+        <div class="space-y-1 flex-1 overflow-y-auto p-3 pt-2">
           <div
             v-for="(stack, stackIndex) in stacks"
             :key="stack.id"
@@ -222,7 +223,7 @@
               <!-- Stack Title Row -->
               <div class="flex items-center gap-2 mb-1 cursor-pointer" @click="toggleStack(stackIndex)">
                 <svg
-                  class="w-3 h-3 text-neutral-500 transition-transform"
+                  class="w-3 h-3 text-neutral-500 transition-transform flex-shrink-0"
                   :class="expandedStacks[stackIndex] ? 'rotate-90' : ''"
                   fill="none"
                   stroke="currentColor"
@@ -230,13 +231,13 @@
                 >
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                 </svg>
-                <span class="flex-1 text-neutral-200 font-semibold text-sm">{{ stack.title }}</span>
-                <div v-if="stackIndex === liveStackIndex" class="w-1.5 h-1.5 bg-gold-500 rounded-full animate-pulse"></div>
+                <span class="flex-1 text-neutral-200 font-semibold text-sm truncate">{{ stack.title }}</span>
+                <div v-if="stackIndex === liveStackIndex" class="w-1.5 h-1.5 bg-gold-500 rounded-full animate-pulse flex-shrink-0"></div>
               </div>
 
               <!-- Stack Controls Row -->
               <div class="flex items-center gap-1 pl-5">
-                <span class="text-xs text-neutral-500 mr-auto">{{ stack.slides.length }} slide{{ stack.slides.length !== 1 ? 's' : '' }}</span>
+                <span class="text-xs text-neutral-500 mr-auto cursor-pointer hover:text-neutral-400" @click="toggleStack(stackIndex)">{{ stack.slides.length }} slide{{ stack.slides.length !== 1 ? 's' : '' }}</span>
 
                 <!-- Stack reorder buttons -->
                 <button
@@ -288,16 +289,16 @@
               <div
                 v-for="(slide, slideIndex) in stack.slides"
                 :key="slideIndex"
-                class="flex items-center gap-1 px-2 py-1 rounded-md transition-all text-xs group"
+                class="flex items-center gap-1.5 px-2 py-1 rounded-md transition-all text-xs group"
                 :class="[
                   stackIndex === stagedStackIndex && slideIndex === stagedSlideIndex
                     ? 'bg-gold-500/20 text-gold-300'
                     : 'text-neutral-400 hover:bg-neutral-700/50 hover:text-neutral-200'
                 ]"
               >
-                <span class="text-[10px] text-neutral-600 w-4">{{ slideIndex + 1 }}</span>
-                <span class="flex-1 truncate cursor-pointer" @click="stageSlideInStack(stackIndex, slideIndex)">{{ slide.title || getSlideTypeName(slide.type) }}</span>
-                <span class="text-[10px]">{{ getSlideTypeIcon(slide.type) }}</span>
+                <span class="text-[10px] text-neutral-600 w-4 flex-shrink-0">{{ slideIndex + 1 }}</span>
+                <span class="text-[11px] flex-shrink-0">{{ getSlideTypeIcon(slide.type) }}</span>
+                <span class="flex-1 truncate cursor-pointer min-w-0" @click="stageSlideInStack(stackIndex, slideIndex)">{{ slide.title || getSlideTypeName(slide.type) }}</span>
 
                 <!-- Reorder buttons -->
                 <button
@@ -1312,18 +1313,35 @@ async function handleCreateNewEvent(eventData) {
 
   // If copying from an existing event, load its data
   if (eventData.copyFrom) {
-    console.log('Copying from event:', eventData.copyFrom)
-    const loadResult = await loadEvent(eventData.copyFrom)
-    if (loadResult.success) {
-      loadPresentationData(JSON.stringify(loadResult.data))
+    console.log('Copying from event:', eventData.copyFrom, 'to new event:', eventData.name)
 
-      // Save immediately with the new name
-      const data = {
-        title: eventData.name,
-        stacks: toRaw(stacks.value)
+    // Load the source event data (this will temporarily change currentEventName)
+    const loadResult = await loadEvent(eventData.copyFrom)
+
+    if (loadResult.success && loadResult.data) {
+      console.log('Loaded event data:', loadResult.data)
+
+      // Copy the stacks from the loaded event
+      if (loadResult.data.stacks && Array.isArray(loadResult.data.stacks)) {
+        stacks.value = JSON.parse(JSON.stringify(loadResult.data.stacks)) // Deep clone
+        console.log('Copied stacks:', stacks.value.length)
+
+        // Now switch back to the new event and save
+        // We need to load the new event to set the correct currentEventName
+        const switchResult = await loadEvent(eventData.name)
+        console.log('Switched to new event:', eventData.name, 'success:', switchResult.success)
+
+        // Save the copied stacks to the new event
+        const data = {
+          title: eventData.name,
+          stacks: toRaw(stacks.value)
+        }
+        await saveEvent(data)
+        console.log('Event copied and saved successfully')
+      } else {
+        console.warn('No stacks found in loaded event')
+        stacks.value = []
       }
-      await saveEvent(data)
-      console.log('Event copied successfully')
     } else {
       // If load fails, just start with empty stacks
       stacks.value = []
@@ -1334,6 +1352,9 @@ async function handleCreateNewEvent(eventData) {
     stacks.value = []
     console.log('Event created (blank)')
   }
+
+  // Close the dialog
+  showNewEventDialog.value = false
 }
 
 async function handleDeleteEvent(eventName) {
