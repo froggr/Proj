@@ -1,5 +1,5 @@
 <template>
-  <div class="w-full h-full bg-black">
+  <div class="w-full h-full bg-black thumbnail-container">
     <!-- No slide -->
     <div v-if="!slide" class="w-full h-full bg-black"></div>
 
@@ -97,3 +97,10 @@ watch(() => [props.slide, props.libraryRoot], async ([newSlide]) => {
   }
 }, { immediate: true })
 </script>
+
+<style scoped>
+/* Enable container queries for proportional text scaling in thumbnails */
+.thumbnail-container {
+  container-type: size;
+}
+</style>
