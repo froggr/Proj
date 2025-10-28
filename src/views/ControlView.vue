@@ -206,7 +206,15 @@
     </div>
 
     <!-- Main Content Area -->
-    <div class="flex-1 flex p-4 gap-4 min-h-0 relative">
+    <!-- Worship Mode -->
+    <WorshipControl
+      v-if="isWorshipModeActive"
+      :text-scale="textScale"
+      :library-root="libraryRoot"
+    />
+
+    <!-- Normal Mode -->
+    <div v-else class="flex-1 flex p-4 gap-4 min-h-0 relative">
       <!-- Left Sidebar: Stacks -->
       <div class="w-72 bg-neutral-900/50 backdrop-blur rounded-xl border border-neutral-800 flex flex-col overflow-hidden">
         <!-- Sticky Header -->
@@ -323,7 +331,7 @@
                   </div>
                 </div>
 
-                <span class="flex-1 truncate cursor-pointer min-w-0" @click="stageSlideInStack(stackIndex, slideIndex)">{{ slide.title || getSlideTypeName(slide.type) }}</span>
+                <span class="flex-1 truncate cursor-pointer min-w-0" @click="handleSlideClick(stackIndex, slideIndex, slide)">{{ slide.title || getSlideTypeName(slide.type) }}</span>
 
                 <!-- Reorder buttons -->
                 <button
@@ -589,6 +597,14 @@
           <span class="text-orange-400">🎬</span>
           Video
         </button>
+        <div class="border-t border-neutral-700 my-1"></div>
+        <button
+          @click="openWorshipDialog"
+          class="w-full px-3 py-2 text-left text-neutral-200 hover:bg-neutral-800 rounded-lg transition-all flex items-center gap-2 text-xs"
+        >
+          <span class="text-purple-400">🎵</span>
+          Worship Stack
+        </button>
       </div>
     </div>
 
@@ -609,6 +625,12 @@
       :initialSlide="editingSlide"
       @close="closeYouTubeDialog"
       @add="handleAddOrUpdateSlide"
+    />
+    <AddWorshipStack
+      :show="showWorshipDialog"
+      :songs="librarySongs"
+      @close="showWorshipDialog = false"
+      @add="handleAddWorshipStack"
     />
     <AssetPicker
       :show="showImageAssetPicker"
@@ -822,6 +844,8 @@ import { usePresentation } from '../composables/usePresentation'
 import { useKeyboard } from '../composables/useKeyboard'
 import { useProjector } from '../composables/useProjector'
 import { useLibrary } from '../composables/useLibrary'
+import { useWorship, loadWorshipStack, exitWorshipMode } from '../composables/useWorship'
+import { useSongLibrary } from '../library/SongLibrary'
 import SlideStaged from '../components/slides/SlideStaged.vue'
 import SlideThumbnail from '../components/slides/SlideThumbnail.vue'
 import ProjectorVideoControls from '../components/ProjectorVideoControls.vue'
@@ -836,6 +860,8 @@ import NewLibraryDialog from '../components/NewLibraryDialog.vue'
 import OpenLibraryDialog from '../components/OpenLibraryDialog.vue'
 import SelectEventDialog from '../components/SelectEventDialog.vue'
 import NewEventDialog from '../components/NewEventDialog.vue'
+import WorshipControl from '../components/worship/WorshipControl.vue'
+import AddWorshipStack from '../components/AddWorshipStack.vue'
 
 const {
   stacks,
@@ -892,11 +918,31 @@ const {
   getLastLibraryPath
 } = useLibrary()
 
+// Worship mode
+const {
+  isWorshipModeActive,
+  currentSong: worshipCurrentSong,
+  liveSection: worshipLiveSection,
+  nextSong: worshipNextSong,
+  prevSong: worshipPrevSong,
+  nextSection: worshipNextSection,
+  prevSection: worshipPrevSection,
+  goLive: worshipGoLive,
+  clearProjection: worshipClearProjection
+} = useWorship()
+
+// Song library
+const {
+  loadSongs,
+  songs: librarySongs
+} = useSongLibrary()
+
 const aspectRatio = ref('16:9-1080')
 const expandedStacks = reactive({})
 const showCustomDialog = ref(false)
 const showBibleDialog = ref(false)
 const showYouTubeDialog = ref(false)
+const showWorshipDialog = ref(false)
 const showImageAssetPicker = ref(false)
 const showVideoAssetPicker = ref(false)
 const showMonitorDialog = ref(false)
@@ -1002,6 +1048,51 @@ function openBibleDialog() {
 function openYouTubeDialog() {
   showAddSlideMenu.value = false
   showYouTubeDialog.value = true
+}
+
+function openWorshipDialog() {
+  showAddSlideMenu.value = false
+  showWorshipDialog.value = true
+}
+
+function handleAddWorshipStack(worshipData) {
+  console.log('Adding worship stack:', worshipData)
+
+  // Create a new stack
+  const stackId = addStack(worshipData.title)
+
+  // Find the newly created stack index
+  const stackIndex = stacks.value.findIndex(s => s.id === stackId)
+
+  if (stackIndex !== -1) {
+    // Add a worship "slide" to the stack
+    const worshipSlide = {
+      type: 'worship',
+      title: worshipData.title,
+      setlist: worshipData.setlist,
+      backgroundMode: worshipData.backgroundMode,
+      backgroundVideos: worshipData.backgroundVideos || []
+    }
+
+    addSlideToStack(stackIndex, worshipSlide)
+
+    // Stage the new worship stack
+    stageStack(stackIndex)
+  }
+
+  showWorshipDialog.value = false
+}
+
+function handleSlideClick(stackIndex, slideIndex, slide) {
+  // Check if this is a worship slide
+  if (slide && slide.type === 'worship') {
+    // Enter worship mode
+    stageSlideInStack(stackIndex, slideIndex)
+    loadWorshipStack(slide)
+  } else {
+    // Normal slide - just stage it
+    stageSlideInStack(stackIndex, slideIndex)
+  }
 }
 
 function openImageDialog() {
@@ -1481,12 +1572,54 @@ async function loadPresentation() {
 }
 
 useKeyboard({
-  onSpace: goLive,
-  onArrowLeft: prevSlide,
-  onArrowRight: nextSlide,
-  onArrowUp: prevStack,
-  onArrowDown: nextStack,
-  onEscape: clearProjection,
+  onSpace: () => {
+    if (isWorshipModeActive.value) {
+      worshipGoLive()
+    } else {
+      goLive()
+    }
+  },
+  onArrowLeft: () => {
+    if (isWorshipModeActive.value) {
+      worshipPrevSection()
+    } else {
+      prevSlide()
+    }
+  },
+  onArrowRight: () => {
+    if (isWorshipModeActive.value) {
+      worshipNextSection()
+    } else {
+      nextSlide()
+    }
+  },
+  onArrowUp: () => {
+    if (!isWorshipModeActive.value) {
+      prevStack()
+    }
+  },
+  onArrowDown: () => {
+    if (!isWorshipModeActive.value) {
+      nextStack()
+    }
+  },
+  onPageUp: () => {
+    if (isWorshipModeActive.value) {
+      worshipPrevSong()
+    }
+  },
+  onPageDown: () => {
+    if (isWorshipModeActive.value) {
+      worshipNextSong()
+    }
+  },
+  onEscape: () => {
+    if (isWorshipModeActive.value) {
+      worshipClearProjection()
+    } else {
+      clearProjection()
+    }
+  },
   onQuit: () => {
     if (window.electronAPI && window.electronAPI.windowClose) {
       window.electronAPI.windowClose()
@@ -1595,6 +1728,26 @@ watch(
       }
     } catch (e) {
       console.warn('Failed to save text scale:', e)
+    }
+  }
+)
+
+// Load songs when library opens
+watch(
+  () => isLibraryOpen.value,
+  async (isOpen) => {
+    if (isOpen && libraryRoot.value) {
+      await loadSongs()
+    }
+  }
+)
+
+// Exit worship mode when navigating away from worship stack
+watch(
+  () => currentSlide.value,
+  (newSlide) => {
+    if (isWorshipModeActive.value && (!newSlide || newSlide.type !== 'worship')) {
+      exitWorshipMode()
     }
   }
 )

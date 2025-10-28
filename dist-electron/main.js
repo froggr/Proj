@@ -906,6 +906,70 @@ app.whenReady().then(async () => {
       callback({ error: -2 });
     }
   });
+  ipcMain.handle("load-songs", async (event, libPath) => {
+    try {
+      const songsPath = path.join(libPath, "songs.json");
+      if (!fs.existsSync(songsPath)) {
+        return { success: true, data: [] };
+      }
+      const data = fs.readFileSync(songsPath, "utf-8");
+      return { success: true, data: JSON.parse(data) };
+    } catch (error) {
+      console.error("Load songs failed:", error);
+      return { success: false, error: error.message };
+    }
+  });
+  ipcMain.handle("save-songs", async (event, libPath, songs) => {
+    try {
+      const songsPath = path.join(libPath, "songs.json");
+      fs.writeFileSync(songsPath, JSON.stringify(songs, null, 2), "utf-8");
+      return { success: true };
+    } catch (error) {
+      console.error("Save songs failed:", error);
+      return { success: false, error: error.message };
+    }
+  });
+  ipcMain.handle("browse-for-song-files", async () => {
+    try {
+      const { filePaths, canceled } = await dialog.showOpenDialog(mainWindow, {
+        title: "Import Song Files",
+        filters: [
+          { name: "All Song Files", extensions: ["txt", "pro", "chordpro", "onsong", "json"] },
+          { name: "ChordPro Files", extensions: ["txt", "pro", "chordpro"] },
+          { name: "OnSong Files", extensions: ["onsong"] },
+          { name: "JSON Files", extensions: ["json"] },
+          { name: "All Files", extensions: ["*"] }
+        ],
+        properties: ["openFile", "multiSelections"]
+      });
+      if (canceled || filePaths.length === 0) {
+        return { success: false, canceled: true };
+      }
+      return { success: true, files: filePaths };
+    } catch (error) {
+      console.error("Browse for song files failed:", error);
+      return { success: false, error: error.message };
+    }
+  });
+  ipcMain.handle("read-song-file", async (event, filePath) => {
+    try {
+      if (!fs.existsSync(filePath)) {
+        return { success: false, error: "File not found" };
+      }
+      const content = fs.readFileSync(filePath, "utf-8");
+      const filename = path.basename(filePath);
+      const ext = path.extname(filePath).toLowerCase();
+      return {
+        success: true,
+        content,
+        filename,
+        extension: ext
+      };
+    } catch (error) {
+      console.error("Read song file failed:", error);
+      return { success: false, error: error.message };
+    }
+  });
   createMainWindow();
   setupRemoteServer(3777);
   app.on("activate", () => {

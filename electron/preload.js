@@ -99,5 +99,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     events.forEach(event => {
       ipcRenderer.on(event, (_, data) => callback(event, data))
     })
-  }
+  },
+
+  // Song Library Management
+  loadSongs: (libPath) => ipcRenderer.invoke('load-songs', libPath),
+  saveSongs: (libPath, songs) => ipcRenderer.invoke('save-songs', libPath, songs),
+  browseForSongFiles: () => ipcRenderer.invoke('browse-for-song-files'),
+  readSongFile: (filePath) => ipcRenderer.invoke('read-song-file', filePath)
 })

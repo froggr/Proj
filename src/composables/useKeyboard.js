@@ -8,6 +8,8 @@ export function useKeyboard(callbacks) {
     onArrowUp,
     onArrowDown,
     onEscape,
+    onPageUp,
+    onPageDown,
     onQuit
   } = callbacks
 
@@ -57,6 +59,14 @@ export function useKeyboard(callbacks) {
       case 'Escape':
         event.preventDefault()
         if (onEscape) onEscape()
+        break
+      case 'PageUp':
+        event.preventDefault()
+        if (onPageUp) onPageUp()
+        break
+      case 'PageDown':
+        event.preventDefault()
+        if (onPageDown) onPageDown()
         break
     }
   }
