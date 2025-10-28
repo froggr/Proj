@@ -72,18 +72,35 @@
             class="group relative bg-neutral-800 rounded-lg overflow-hidden border border-neutral-700 hover:border-neutral-600 transition-all"
           >
             <!-- Preview -->
-            <div class="aspect-video bg-neutral-900 flex items-center justify-center">
+            <div
+              class="aspect-video bg-neutral-900 flex items-center justify-center relative"
+              :class="asset.type === 'video' ? 'cursor-pointer' : ''"
+              @click="asset.type === 'video' ? openVideoPreview(asset) : null"
+            >
               <img
                 v-if="asset.type === 'image'"
                 :src="'local-image://' + asset.path"
                 class="w-full h-full object-cover"
                 @error="handleImageError"
               />
-              <div v-else-if="asset.type === 'video'" class="w-full h-full flex items-center justify-center">
-                <svg class="w-16 h-16 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+              <div v-else-if="asset.type === 'video'" class="w-full h-full relative">
+                <!-- Thumbnail if available -->
+                <img
+                  v-if="asset.thumbnailUrl"
+                  :src="getAssetUrl(asset.thumbnailUrl)"
+                  class="w-full h-full object-cover"
+                />
+                <!-- Fallback icon if no thumbnail -->
+                <div v-else class="w-full h-full flex items-center justify-center">
+                  <svg class="w-16 h-16 text-neutral-600 group-hover:text-gold-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <!-- Click to preview hint -->
+                <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <div class="text-white text-sm font-medium">Click to Preview</div>
+                </div>
               </div>
             </div>
 
@@ -170,11 +187,87 @@
         </div>
       </div>
     </div>
+
+    <!-- Video Preview Modal -->
+    <div v-if="showVideoPreview && previewVideo" class="fixed inset-0 z-[70] flex items-center justify-center bg-black/95 backdrop-blur-sm">
+      <div class="bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-neutral-800 flex-shrink-0">
+          <div>
+            <h2 class="text-lg font-semibold text-gold-500">Video Preview</h2>
+            <p class="text-sm text-neutral-400 mt-1">{{ previewVideo.filename }}</p>
+          </div>
+          <button
+            @click="closeVideoPreview"
+            class="text-neutral-400 hover:text-white transition-colors"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Video Player -->
+        <div class="flex-1 overflow-hidden p-6">
+          <div class="aspect-video bg-black rounded-lg overflow-hidden">
+            <video
+              id="library-preview-video"
+              :src="'file://' + previewVideo.path"
+              class="w-full h-full"
+              controls
+              preload="metadata"
+            ></video>
+          </div>
+
+          <!-- Video Info -->
+          <div class="mt-4 p-4 bg-neutral-800 rounded-lg">
+            <div class="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span class="text-neutral-400">Size:</span>
+                <span class="text-white ml-2">{{ formatFileSize(previewVideo.size) }}</span>
+              </div>
+              <div v-if="previewVideo.metadata?.width && previewVideo.metadata?.height">
+                <span class="text-neutral-400">Dimensions:</span>
+                <span class="text-white ml-2">{{ previewVideo.metadata.width }} × {{ previewVideo.metadata.height }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="flex items-center justify-between gap-3 px-6 py-4 border-t border-neutral-800 flex-shrink-0">
+          <div class="text-sm text-neutral-400">
+            Generate a thumbnail from this video
+          </div>
+          <div class="flex gap-3">
+            <button
+              @click="closeVideoPreview"
+              class="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg transition-colors"
+            >
+              Close
+            </button>
+            <button
+              @click="regenerateThumbnail"
+              :disabled="regeneratingThumbnail"
+              class="px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              :class="regeneratingThumbnail ? 'bg-neutral-700 text-neutral-500' : 'bg-gold-500 hover:bg-gold-600 text-black'"
+            >
+              <svg v-if="regeneratingThumbnail" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span>{{ regeneratingThumbnail ? 'Generating...' : 'Regenerate Thumbnail' }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
+import { extractVideoThumbnail } from '../utils/videoThumbnail.js'
 
 const props = defineProps({
   show: {
@@ -195,6 +288,11 @@ const filterType = ref('all')
 const deleteConfirmation = ref(null)
 const checkingUsage = ref(false)
 const assetUsage = ref([])
+
+// Video preview modal
+const showVideoPreview = ref(false)
+const previewVideo = ref(null)
+const regeneratingThumbnail = ref(false)
 
 const filteredAssets = computed(() => {
   if (filterType.value === 'all') return assets.value
@@ -289,10 +387,110 @@ function handleImageError(e) {
   console.error('Failed to load image preview:', e.target.src)
 }
 
+function getAssetUrl(assetUrl) {
+  // Convert assets:// URLs to local-image:// for display
+  if (assetUrl && assetUrl.startsWith('assets://')) {
+    // Extract the relative path after assets://
+    const relativePath = assetUrl.replace('assets://', '')
+    // Construct full path
+    const fullPath = `${props.libraryRoot}/assets/${relativePath}`
+    return `local-image://${fullPath}`
+  }
+  return assetUrl
+}
+
 function formatFileSize(bytes) {
   if (!bytes) return 'Unknown size'
   if (bytes < 1024) return bytes + ' B'
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+}
+
+async function openVideoPreview(asset) {
+  if (asset.type !== 'video') return
+
+  previewVideo.value = asset
+  showVideoPreview.value = true
+
+  // Wait for video element to render
+  await nextTick()
+}
+
+function closeVideoPreview() {
+  showVideoPreview.value = false
+  previewVideo.value = null
+  regeneratingThumbnail.value = false
+}
+
+async function regenerateThumbnail() {
+  if (!previewVideo.value || !window.electronAPI) return
+
+  regeneratingThumbnail.value = true
+
+  try {
+    // Get the video element
+    const videoElement = document.getElementById('library-preview-video')
+    if (!videoElement) {
+      console.error('Video element not found')
+      return
+    }
+
+    // Wait for video to load metadata
+    await new Promise((resolve, reject) => {
+      if (videoElement.readyState >= 1) {
+        resolve()
+      } else {
+        videoElement.addEventListener('loadedmetadata', resolve, { once: true })
+        videoElement.addEventListener('error', reject, { once: true })
+        setTimeout(() => reject(new Error('Timeout loading video')), 10000)
+      }
+    })
+
+    console.log('Extracting thumbnail for', previewVideo.value.filename)
+    const thumbnailDataUrl = await extractVideoThumbnail(videoElement, 10)
+
+    // Convert videoUrl from path to assets:// URL format
+    // e.g., /path/to/library/assets/media/2024-10/video.mp4 -> assets://media/2024-10/video.mp4
+    const libraryAssetsPath = props.libraryRoot + '/assets/'
+    let videoUrl = previewVideo.value.url
+
+    // If url is not in assets:// format, construct it from path
+    if (!videoUrl.startsWith('assets://')) {
+      const relativePath = previewVideo.value.path.replace(libraryAssetsPath, '')
+      videoUrl = `assets://${relativePath}`
+    }
+
+    console.log('Saving thumbnail for video URL:', videoUrl)
+
+    // Save thumbnail via IPC
+    const result = await window.electronAPI.saveVideoThumbnail(
+      props.libraryRoot,
+      videoUrl,
+      thumbnailDataUrl
+    )
+
+    if (result.success) {
+      console.log('Thumbnail saved successfully:', result.thumbnailUrl)
+
+      // Reload assets to show new thumbnail
+      await loadAssets()
+
+      // Update the preview video reference
+      const updatedAsset = assets.value.find(a => a.path === previewVideo.value.path)
+      if (updatedAsset) {
+        previewVideo.value = updatedAsset
+      }
+
+      alert('Thumbnail regenerated successfully!')
+    } else {
+      console.error('Failed to save thumbnail:', result.error)
+      alert('Failed to save thumbnail: ' + result.error)
+    }
+  } catch (error) {
+    console.error('Error regenerating thumbnail:', error)
+    alert('Error regenerating thumbnail: ' + error.message)
+  } finally {
+    regeneratingThumbnail.value = false
+  }
 }
 </script>

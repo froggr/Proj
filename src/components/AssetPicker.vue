@@ -112,11 +112,20 @@
                   @error="handleImageError"
                 />
                 <!-- Video Preview -->
-                <div v-else-if="asset.type === 'video'" class="w-full h-full flex items-center justify-center">
-                  <svg class="w-12 h-12 text-neutral-600 group-hover:text-gold-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+                <div v-else-if="asset.type === 'video'" class="w-full h-full">
+                  <!-- Thumbnail if available -->
+                  <img
+                    v-if="asset.thumbnailUrl"
+                    :src="getAssetUrl(asset.thumbnailUrl)"
+                    class="w-full h-full object-cover"
+                  />
+                  <!-- Fallback icon -->
+                  <div v-else class="w-full h-full flex items-center justify-center">
+                    <svg class="w-12 h-12 text-neutral-600 group-hover:text-gold-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
                 </div>
                 <!-- Filename Overlay -->
                 <div class="absolute bottom-0 left-0 right-0 bg-black/80 px-2 py-1">
@@ -184,11 +193,129 @@
         </div>
       </div>
     </div>
+
+    <!-- Preview Modal -->
+    <div v-if="showPreviewModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-sm">
+      <div class="bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-neutral-800 flex-shrink-0">
+          <div>
+            <h2 class="text-lg font-semibold text-gold-500">Preview Assets</h2>
+            <p class="text-sm text-neutral-400 mt-1">{{ previewAssets.length }} {{ previewAssets.length === 1 ? 'file' : 'files' }} selected</p>
+          </div>
+          <button
+            @click="cancelPreview"
+            class="text-neutral-400 hover:text-white transition-colors"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Thumbnail Progress -->
+        <div v-if="processingThumbnails" class="px-6 py-3 bg-neutral-800/50 border-b border-neutral-800 flex-shrink-0">
+          <div class="flex items-center gap-3">
+            <div class="flex-shrink-0">
+              <svg class="w-5 h-5 text-gold-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </div>
+            <div class="flex-1">
+              <div class="text-sm text-neutral-300 mb-1">Extracting video thumbnails... {{ thumbnailProgress.current }} / {{ thumbnailProgress.total }}</div>
+              <div class="h-1.5 bg-neutral-700 rounded-full overflow-hidden">
+                <div
+                  class="h-full bg-gold-500 transition-all duration-300"
+                  :style="{ width: (thumbnailProgress.current / thumbnailProgress.total * 100) + '%' }"
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Preview Grid -->
+        <div class="flex-1 overflow-y-auto p-6">
+          <div class="grid grid-cols-3 gap-4">
+            <div
+              v-for="(asset, index) in previewAssets"
+              :key="index"
+              class="relative aspect-video bg-neutral-800 rounded-lg overflow-hidden border border-neutral-700"
+            >
+              <!-- Image Preview -->
+              <img
+                v-if="asset.type === 'image'"
+                :src="'file://' + asset.path"
+                class="w-full h-full object-cover"
+              />
+
+              <!-- Video: Show thumbnail if extracted, otherwise show video -->
+              <div v-else-if="asset.type === 'video'" class="w-full h-full relative">
+                <!-- Extracted thumbnail -->
+                <img
+                  v-if="asset.thumbnailDataUrl"
+                  :src="asset.thumbnailDataUrl"
+                  class="w-full h-full object-cover"
+                />
+                <!-- Video for extraction (hidden after thumbnail extracted) -->
+                <video
+                  v-else
+                  :id="`preview-video-${index}`"
+                  :src="'file://' + asset.path"
+                  class="w-full h-full object-cover"
+                  preload="metadata"
+                  muted
+                ></video>
+              </div>
+
+              <!-- Filename Overlay -->
+              <div class="absolute bottom-0 left-0 right-0 bg-black/80 px-2 py-1.5">
+                <p class="text-xs text-white truncate">{{ asset.filename }}</p>
+                <p class="text-[10px] text-neutral-400">{{ asset.type }}</p>
+              </div>
+
+              <!-- Processing Indicator -->
+              <div v-if="asset.type === 'video' && processingThumbnails && index < thumbnailProgress.current" class="absolute top-2 right-2">
+                <div class="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                  <svg class="w-4 h-4 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="flex items-center justify-between gap-3 px-6 py-4 border-t border-neutral-800 flex-shrink-0">
+          <div class="text-sm text-neutral-400">
+            Review your selections before importing
+          </div>
+          <div class="flex gap-3">
+            <button
+              @click="cancelPreview"
+              class="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              @click="confirmImport"
+              :disabled="processingThumbnails || loading"
+              class="px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              :class="(processingThumbnails || loading) ? 'bg-neutral-700 text-neutral-500' : 'bg-gold-500 hover:bg-gold-600 text-black'"
+            >
+              {{ loading ? 'Importing...' : `Import ${previewAssets.length} ${previewAssets.length === 1 ? 'File' : 'Files'}` }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
+import { extractVideoThumbnail } from '../utils/videoThumbnail.js'
 
 const props = defineProps({
   show: {
@@ -221,6 +348,12 @@ const filterType = ref('all')
 const loading = ref(false)
 const assets = ref([])
 const selectedAssets = ref([])
+
+// Preview modal state
+const showPreviewModal = ref(false)
+const previewAssets = ref([])
+const processingThumbnails = ref(false)
+const thumbnailProgress = ref({ current: 0, total: 0 })
 
 const assetTypeLabel = computed(() => {
   if (props.assetType === 'image') return 'images'
@@ -267,17 +400,113 @@ async function loadLibraryAssets() {
 async function browseForFiles() {
   if (!window.electronAPI || !props.libraryRoot) return
 
-  const result = await window.electronAPI.importAssetsToLibrary(props.libraryRoot, props.assetType)
-  if (result.success && result.assets.length > 0) {
-    // Reload the assets list to show newly imported files
-    await loadLibraryAssets()
-
-    // For single selection, return the first imported asset
-    // For multiple selection, you could return all of them
-    const asset = result.assets[0]
-    emit('select', asset)
-    handleClose()
+  // Step 1: Browse for files (no import yet)
+  const browseResult = await window.electronAPI.browseForAssets(props.assetType)
+  if (!browseResult.success || browseResult.canceled || browseResult.files.length === 0) {
+    return
   }
+
+  console.log('Selected files for preview:', browseResult.files)
+
+  // Step 2: Show preview modal
+  previewAssets.value = browseResult.files
+  showPreviewModal.value = true
+
+  // Step 3: Wait for next tick to ensure video elements are rendered
+  await nextTick()
+
+  // Step 4: Extract thumbnails from videos
+  await extractThumbnailsFromPreviews()
+}
+
+async function extractThumbnailsFromPreviews() {
+  const videos = previewAssets.value.filter(f => f.type === 'video')
+  if (videos.length === 0) return
+
+  processingThumbnails.value = true
+  thumbnailProgress.value = { current: 0, total: videos.length }
+
+  for (let i = 0; i < videos.length; i++) {
+    // Find the index in previewAssets (not just videos array)
+    const assetIndex = previewAssets.value.findIndex(a => a === videos[i])
+    const video = videos[i]
+    thumbnailProgress.value.current = i + 1
+
+    try {
+      // Get the video element for this preview
+      const videoElement = document.getElementById(`preview-video-${assetIndex}`)
+      if (!videoElement) {
+        console.error(`Video element not found for ${video.filename}`)
+        continue
+      }
+
+      // Wait for video to load metadata
+      await new Promise((resolve, reject) => {
+        if (videoElement.readyState >= 1) {
+          resolve()
+        } else {
+          videoElement.addEventListener('loadedmetadata', resolve, { once: true })
+          videoElement.addEventListener('error', reject, { once: true })
+          setTimeout(() => reject(new Error('Timeout loading video')), 10000)
+        }
+      })
+
+      console.log(`Extracting thumbnail for ${video.filename}...`)
+      const thumbnailDataUrl = await extractVideoThumbnail(videoElement, 10)
+
+      // Store thumbnail data URL in the video object (Vue will react and update the display)
+      video.thumbnailDataUrl = thumbnailDataUrl
+      console.log(`Thumbnail extracted for ${video.filename}`)
+    } catch (error) {
+      console.error(`Failed to extract thumbnail for ${video.filename}:`, error)
+    }
+  }
+
+  processingThumbnails.value = false
+}
+
+async function confirmImport() {
+  if (!window.electronAPI || !props.libraryRoot) return
+
+  loading.value = true
+
+  try {
+    // Step 5: Import files and save thumbnails
+    const result = await window.electronAPI.importAssetsWithThumbnails(
+      props.libraryRoot,
+      previewAssets.value
+    )
+
+    if (result.success && result.assets.length > 0) {
+      console.log('Assets imported:', result.assets)
+
+      // Reload the assets list
+      await loadLibraryAssets()
+
+      // Close preview modal
+      showPreviewModal.value = false
+      previewAssets.value = []
+
+      // Return the imported assets
+      if (props.multiSelect) {
+        emit('select', result.assets)
+      } else {
+        emit('select', result.assets[0])
+      }
+      handleClose()
+    }
+  } catch (error) {
+    console.error('Import failed:', error)
+  } finally {
+    loading.value = false
+  }
+}
+
+function cancelPreview() {
+  showPreviewModal.value = false
+  previewAssets.value = []
+  processingThumbnails.value = false
+  thumbnailProgress.value = { current: 0, total: 0 }
 }
 
 function selectAsset(asset) {
@@ -317,6 +546,18 @@ function handleClose() {
 
 function handleImageError(event) {
   event.target.src = '' // Could set a placeholder image here
+}
+
+function getAssetUrl(assetUrl) {
+  // Convert assets:// URLs to local-image:// for display
+  if (assetUrl && assetUrl.startsWith('assets://')) {
+    // Extract the relative path after assets://
+    const relativePath = assetUrl.replace('assets://', '')
+    // Construct full path
+    const fullPath = `${props.libraryRoot}/assets/${relativePath}`
+    return `local-image://${fullPath}`
+  }
+  return assetUrl
 }
 
 // Load assets when dialog opens

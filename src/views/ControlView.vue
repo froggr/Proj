@@ -289,15 +289,27 @@
               <div
                 v-for="(slide, slideIndex) in stack.slides"
                 :key="slideIndex"
-                class="flex items-center gap-1.5 px-2 py-1 rounded-md transition-all text-xs group"
+                class="flex items-center gap-1.5 px-2 py-1 rounded-md transition-all text-xs group relative"
                 :class="[
                   stackIndex === stagedStackIndex && slideIndex === stagedSlideIndex
                     ? 'bg-gold-500/20 text-gold-300'
-                    : 'text-neutral-400 hover:bg-neutral-700/50 hover:text-neutral-200'
+                    : 'text-neutral-400 hover:bg-neutral-700/50 hover:text-neutral-200',
+                  stackIndex === liveStackIndex && slideIndex === liveSlideIndex
+                    ? 'ring-2 ring-emerald-500/50 bg-emerald-500/10'
+                    : ''
                 ]"
               >
                 <span class="text-[10px] text-neutral-600 w-4 flex-shrink-0">{{ slideIndex + 1 }}</span>
                 <span class="text-[11px] flex-shrink-0">{{ getSlideTypeIcon(slide.type) }}</span>
+
+                <!-- Live indicator dot -->
+                <div v-if="stackIndex === liveStackIndex && slideIndex === liveSlideIndex" class="flex-shrink-0 flex items-center justify-center w-4">
+                  <div class="relative flex items-center justify-center">
+                    <div class="absolute w-2 h-2 bg-emerald-400 rounded-full animate-ping opacity-75"></div>
+                    <div class="relative w-1.5 h-1.5 bg-emerald-400 rounded-full shadow-lg shadow-emerald-500/50"></div>
+                  </div>
+                </div>
+
                 <span class="flex-1 truncate cursor-pointer min-w-0" @click="stageSlideInStack(stackIndex, slideIndex)">{{ slide.title || getSlideTypeName(slide.type) }}</span>
 
                 <!-- Reorder buttons -->
@@ -473,22 +485,26 @@
               v-for="(slide, index) in currentStack?.slides || []"
               :key="index"
               @click="selectSlide(index)"
-              class="flex-shrink-0 w-24 h-14 rounded-lg cursor-pointer transition-all border overflow-hidden"
+              class="flex-shrink-0 w-24 h-14 rounded-lg cursor-pointer transition-all border relative"
               :class="[
                 index === stagedSlideIndex
                   ? 'border-gold-500 ring-2 ring-gold-500/30 shadow-lg shadow-gold-500/20'
                   : 'border-neutral-700 hover:border-neutral-600',
                 index === liveSlideIndex && liveStackIndex === stagedStackIndex
-                  ? 'ring-2 ring-gold-500/50'
+                  ? 'ring-4 ring-emerald-500/60 border-emerald-400 shadow-xl shadow-emerald-500/40'
                   : ''
               ]"
             >
-              <div class="w-full h-full bg-black relative">
+              <div class="w-full h-full bg-black relative overflow-hidden rounded-lg">
                 <SlideThumbnail :slide="slide" :library-root="libraryRoot" :text-scale="textScale" />
                 <div class="absolute bottom-0.5 left-0.5 px-1 py-0.5 bg-black/80 text-[9px] text-neutral-400 font-medium rounded">
                   {{ index + 1 }}
                 </div>
-                <div v-if="index === liveSlideIndex && liveStackIndex === stagedStackIndex" class="absolute top-0.5 right-0.5 w-1.5 h-1.5 bg-gold-500 rounded-full animate-pulse"></div>
+                <!-- Enhanced live indicator -->
+                <div v-if="index === liveSlideIndex && liveStackIndex === stagedStackIndex" class="absolute top-1 right-1 flex items-center justify-center">
+                  <div class="absolute w-3 h-3 bg-emerald-400 rounded-full animate-ping opacity-75"></div>
+                  <div class="relative w-2.5 h-2.5 bg-emerald-400 rounded-full shadow-lg shadow-emerald-500/50"></div>
+                </div>
               </div>
             </div>
           </div>
@@ -1024,6 +1040,10 @@ function handleVideoAssetSelected(assetOrAssets) {
       type: 'video',
       videoUrl: asset.url,  // This will be assets://...
       title: asset.filename
+    }
+    // Include thumbnailUrl if available (for performance)
+    if (asset.thumbnailUrl) {
+      slide.thumbnailUrl = asset.thumbnailUrl
     }
     handleAddSlide(slide)
   })

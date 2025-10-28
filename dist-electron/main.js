@@ -370,6 +370,7 @@ ipcMain.handle("create-library", async (event, parentPath, libraryName) => {
     fs.mkdirSync(path.join(libraryPath, "assets", "branding"), { recursive: true });
     fs.mkdirSync(path.join(libraryPath, "assets", "media"), { recursive: true });
     fs.mkdirSync(path.join(libraryPath, "assets", ".trash"), { recursive: true });
+    fs.mkdirSync(path.join(libraryPath, "assets", ".thumbnails"), { recursive: true });
     fs.mkdirSync(path.join(libraryPath, "events"), { recursive: true });
     const metadata = {
       name: libraryName,
@@ -541,12 +542,20 @@ ipcMain.handle("list-library-assets", async (event, libPath) => {
             assetType = "video";
           }
           if (assetType) {
-            assets.push({
+            const asset = {
               filename: item.name,
               path: assetPath,
               url: assetUrl,
               type: assetType
-            });
+            };
+            if (assetType === "video") {
+              const thumbnailFileName = `${item.name}.jpg`;
+              const thumbnailPath = path.join(libPath, "assets", ".thumbnails", thumbnailFileName);
+              if (fs.existsSync(thumbnailPath)) {
+                asset.thumbnailUrl = `assets://.thumbnails/${thumbnailFileName}`;
+              }
+            }
+            assets.push(asset);
           }
         }
       }
@@ -668,6 +677,116 @@ ipcMain.handle("delete-library-asset", async (event, libPath, assetPath) => {
     return { success: true };
   } catch (error) {
     console.error("Delete asset failed:", error);
+    return { success: false, error: error.message };
+  }
+});
+ipcMain.handle("browse-for-assets", async (event, assetType) => {
+  try {
+    let filters = [];
+    if (assetType === "image") {
+      filters = [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"] }];
+    } else if (assetType === "video") {
+      filters = [{ name: "Videos", extensions: ["mp4", "webm", "ogg", "mov", "avi", "mkv"] }];
+    } else {
+      filters = [
+        { name: "Media Files", extensions: ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "mp4", "webm", "ogg", "mov", "avi", "mkv"] }
+      ];
+    }
+    const { filePaths, canceled } = await dialog.showOpenDialog(mainWindow, {
+      title: "Select Assets",
+      filters,
+      properties: ["openFile", "multiSelections"]
+    });
+    if (canceled || filePaths.length === 0) {
+      return { success: false, canceled: true };
+    }
+    const imageExtensions = ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"];
+    const videoExtensions = ["mp4", "webm", "ogg", "mov", "avi", "mkv"];
+    const files = filePaths.map((filePath) => {
+      const filename = path.basename(filePath);
+      const ext = filename.split(".").pop().toLowerCase();
+      let type = "unknown";
+      if (imageExtensions.includes(ext)) {
+        type = "image";
+      } else if (videoExtensions.includes(ext)) {
+        type = "video";
+      }
+      return {
+        filename,
+        path: filePath,
+        type
+      };
+    });
+    return { success: true, files };
+  } catch (error) {
+    console.error("Browse for assets failed:", error);
+    return { success: false, error: error.message };
+  }
+});
+ipcMain.handle("import-assets-with-thumbnails", async (event, libPath, assets) => {
+  try {
+    if (!libPath) {
+      return { success: false, error: "No library open" };
+    }
+    const now = /* @__PURE__ */ new Date();
+    const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const targetDir = path.join(libPath, "assets", "media", yearMonth);
+    fs.mkdirSync(targetDir, { recursive: true });
+    const thumbnailsDir = path.join(libPath, "assets", ".thumbnails");
+    fs.mkdirSync(thumbnailsDir, { recursive: true });
+    const importedAssets = [];
+    for (const asset of assets) {
+      const filename = asset.filename;
+      const sourcePath = asset.path;
+      const targetPath = path.join(targetDir, filename);
+      fs.copyFileSync(sourcePath, targetPath);
+      const assetUrl = `assets://media/${yearMonth}/${filename}`;
+      const importedAsset = {
+        filename,
+        path: targetPath,
+        url: assetUrl,
+        type: asset.type
+      };
+      if (asset.type === "video" && asset.thumbnailDataUrl) {
+        try {
+          const thumbnailFileName = `${filename}.jpg`;
+          const thumbnailPath = path.join(thumbnailsDir, thumbnailFileName);
+          const base64Data = asset.thumbnailDataUrl.replace(/^data:image\/\w+;base64,/, "");
+          const buffer = Buffer.from(base64Data, "base64");
+          fs.writeFileSync(thumbnailPath, buffer);
+          importedAsset.thumbnailUrl = `assets://.thumbnails/${thumbnailFileName}`;
+          console.log(`Saved thumbnail for ${filename}`);
+        } catch (thumbError) {
+          console.error(`Failed to save thumbnail for ${filename}:`, thumbError);
+        }
+      }
+      importedAssets.push(importedAsset);
+    }
+    console.log("Assets imported with thumbnails:", importedAssets);
+    return { success: true, assets: importedAssets };
+  } catch (error) {
+    console.error("Import assets with thumbnails failed:", error);
+    return { success: false, error: error.message };
+  }
+});
+ipcMain.handle("save-video-thumbnail", async (event, libPath, videoUrl, thumbnailDataUrl) => {
+  try {
+    if (!libPath || !videoUrl || !thumbnailDataUrl) {
+      return { success: false, error: "Invalid parameters" };
+    }
+    const thumbnailsDir = path.join(libPath, "assets", ".thumbnails");
+    fs.mkdirSync(thumbnailsDir, { recursive: true });
+    const videoFileName = videoUrl.split("/").pop();
+    const thumbnailFileName = `${videoFileName}.jpg`;
+    const thumbnailPath = path.join(thumbnailsDir, thumbnailFileName);
+    const base64Data = thumbnailDataUrl.replace(/^data:image\/\w+;base64,/, "");
+    const buffer = Buffer.from(base64Data, "base64");
+    fs.writeFileSync(thumbnailPath, buffer);
+    console.log("Thumbnail saved:", thumbnailPath);
+    const thumbnailUrl = `assets://.thumbnails/${thumbnailFileName}`;
+    return { success: true, thumbnailUrl };
+  } catch (error) {
+    console.error("Save video thumbnail failed:", error);
     return { success: false, error: error.message };
   }
 });
