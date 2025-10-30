@@ -94,8 +94,19 @@ function onVideoError(e) {
     code: error?.code,
     message: error?.message,
     src: video.src,
+    originalUrl: props.videoUrl,
+    libraryRoot: props.libraryRoot,
     retryAttempt: retryCount.value
   })
+
+  // Provide helpful error messages
+  if (error?.code === 4) {
+    console.error('PIPELINE_ERROR_READ: This usually means:')
+    console.error('  1. The video file doesn\'t exist at that path')
+    console.error('  2. The file is corrupted or unreadable')
+    console.error('  3. For background videos, try re-importing as category="backgrounds"')
+    console.error('  4. Check the file exists:', video.src)
+  }
 
   retryVideoLoad()
 }

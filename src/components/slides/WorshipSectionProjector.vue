@@ -14,8 +14,8 @@
       :style="{ opacity: slide.backgroundOpacity || 0.4 }"
     />
 
-    <!-- Lyrics overlay - clean, no section names, no chords, no song info -->
-    <div class="relative z-10 w-full px-12 text-center">
+    <!-- Lyrics overlay - clean, no section names, no chords, no song info (hidden when lyricsCleared is true or section has no lyrics) -->
+    <div v-if="!slide.lyricsCleared && hasLyrics" class="relative z-10 w-full px-12 text-center">
       <div class="space-y-4">
         <div
           v-for="(line, lineIndex) in slide.sectionData.lines"
@@ -65,6 +65,17 @@ const props = defineProps({
     type: Boolean,
     default: false
   }
+})
+
+// Check if section has lyrics
+const hasLyrics = computed(() => {
+  if (!props.slide.sectionData) return false
+  if (!props.slide.sectionData.lines || props.slide.sectionData.lines.length === 0) return false
+
+  // Check if any line has actual text (not just empty pairs)
+  return props.slide.sectionData.lines.some(line =>
+    line.some(pair => pair[1] && pair[1].trim().length > 0)
+  )
 })
 
 // Base font size using container query units (cqw) for proportional scaling

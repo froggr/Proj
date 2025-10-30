@@ -9,6 +9,7 @@ const activeWorshipStack = ref(null) // { id, setlist: [songIds], backgroundMode
 const currentSongIndex = ref(0) // Index in setlist
 const stagedSectionIndex = ref(0) // Currently staged section
 const liveSectionIndex = ref(null) // Currently live section (null = nothing live)
+const lyricsCleared = ref(false) // True when lyrics are hidden but background is still showing
 
 // Debug logging
 import { watch } from 'vue'
@@ -34,13 +35,37 @@ const nextBackgroundVideo = ref(null) // Next video URL for crossfade
  * @param {Object} stackData - { currentSong, setlist, backgroundMode, backgroundVideos }
  */
 export function loadWorshipStack(stackData) {
+  // Add intro/outro sections if they don't exist (for songs imported before this feature)
+  if (stackData.currentSong?.processed_sections) {
+    const sections = stackData.currentSong.processed_sections
+
+    // Check if Intro exists (first section)
+    if (!sections[0] || sections[0].title !== 'Intro') {
+      sections.unshift({ title: 'Intro', lines: [] })
+    }
+
+    // Check if Outro exists (last section)
+    if (!sections[sections.length - 1] || sections[sections.length - 1].title !== 'Outro') {
+      sections.push({ title: 'Outro', lines: [] })
+    }
+  }
+
   activeWorshipStack.value = stackData
   currentSongIndex.value = 0
   stagedSectionIndex.value = 0
   liveSectionIndex.value = null
+  lyricsCleared.value = false
 
-  // Load background video if in per-song mode
-  if (stackData.backgroundMode === 'per-song') {
+  // Load background video based on mode
+  if (stackData.backgroundMode === 'single') {
+    // Single video mode - use the backgroundVideo directly
+    if (stackData.backgroundVideos?.length > 0) {
+      currentBackgroundVideo.value = stackData.backgroundVideos[0]
+    } else if (stackData.backgroundVideo) {
+      // Support both backgroundVideo (single) and backgroundVideos (array)
+      currentBackgroundVideo.value = stackData.backgroundVideo
+    }
+  } else if (stackData.backgroundMode === 'per-song') {
     loadBackgroundVideoForCurrentSong()
   } else if (stackData.backgroundMode === 'auto-rotate') {
     // Pick random video from rotation list
@@ -59,6 +84,7 @@ export function exitWorshipMode() {
   currentSongIndex.value = 0
   stagedSectionIndex.value = 0
   liveSectionIndex.value = null
+  lyricsCleared.value = false
   currentBackgroundVideo.value = null
   nextBackgroundVideo.value = null
 }
@@ -181,13 +207,23 @@ export function prevSection() {
  */
 export function goLive() {
   liveSectionIndex.value = stagedSectionIndex.value
+  lyricsCleared.value = false // Reset lyrics cleared state when going live
 }
 
 /**
- * Clear projection (blackout)
+ * Clear projection with two-stage behavior:
+ * 1st call: Clear lyrics but keep background
+ * 2nd call: Clear everything (black screen)
  */
 export function clearProjection() {
-  liveSectionIndex.value = null
+  if (!lyricsCleared.value && liveSectionIndex.value !== null) {
+    // First ESC: Clear lyrics but keep background
+    lyricsCleared.value = true
+  } else {
+    // Second ESC (or ESC when already cleared): Full blackout
+    liveSectionIndex.value = null
+    lyricsCleared.value = false
+  }
 }
 
 /**
@@ -304,6 +340,7 @@ export function useWorship(findSongById) {
     currentSongIndex,
     stagedSectionIndex,
     liveSectionIndex,
+    lyricsCleared,
     currentBackgroundVideo,
     nextBackgroundVideo,
 

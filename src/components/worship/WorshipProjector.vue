@@ -31,9 +31,9 @@
       ></video>
     </div>
 
-    <!-- Lyrics Overlay -->
+    <!-- Lyrics Overlay (hidden when lyricsCleared is true) -->
     <div
-      v-if="section"
+      v-if="section && !lyricsCleared"
       class="absolute inset-0 flex items-center justify-center p-[4.5%]"
     >
       <div class="text-center max-w-full">
@@ -127,6 +127,10 @@ const props = defineProps({
   videoOpacity: {
     type: Number,
     default: 0.6 // Default medium opacity for background video
+  },
+  lyricsCleared: {
+    type: Boolean,
+    default: false
   }
 })
 

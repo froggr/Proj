@@ -107,6 +107,17 @@ export function parseOnSong(data, filename = 'Untitled') {
     lines: section.lines || []
   }))
 
+  // Add blank intro and outro sections for background control
+  processed_sections.unshift({
+    title: 'Intro',
+    lines: [] // Empty lines = blank slide (background only)
+  })
+
+  processed_sections.push({
+    title: 'Outro',
+    lines: [] // Empty lines = blank slide (background only)
+  })
+
   return {
     id: Date.now().toString(),
     title,

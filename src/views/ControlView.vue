@@ -1504,6 +1504,8 @@ const {
     liveSection,
     stagedSectionIndex,
     liveSectionIndex,
+    lyricsCleared,
+    currentBackgroundVideo,
     nextSection: worshipNextSection,
     prevSection: worshipPrevSection,
     goLive: worshipGoLive,
@@ -2500,6 +2502,7 @@ watch(
         // Exit worship mode when navigating to non-song slides
         else if (isWorshipModeActive.value) {
             exitWorshipMode();
+            // Don't clear the projector here - let usePresentation handle normal slide projection
         }
     },
 );
@@ -2536,7 +2539,8 @@ watch(
                 songArtist: song.artist,
                 songKey: song.current_key || song.key,
                 backgroundMode: currentSlide.value?.backgroundMode || 'none',
-                backgroundVideo: currentSlide.value?.backgroundVideo || null
+                backgroundVideo: currentBackgroundVideo.value || currentSlide.value?.backgroundVideo || null,
+                lyricsCleared: lyricsCleared.value
             };
 
             // Send to projector via updateProjector helper
