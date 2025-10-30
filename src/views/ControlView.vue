@@ -220,16 +220,39 @@
         <!-- Sticky Header -->
         <div class="flex items-center justify-between p-3 pb-2 bg-neutral-900/50 backdrop-blur border-b border-neutral-800/50 flex-shrink-0">
           <h2 class="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Stacks</h2>
-          <button
-            @click="addNewStack"
-            :disabled="!isEventOpen"
-            class="p-1 bg-gold-500/10 hover:bg-gold-500/20 rounded-lg text-gold-500 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-            :title="!isEventOpen ? 'Open or create an event first' : 'Add Stack'"
-          >
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-            </svg>
-          </button>
+          <div class="relative">
+            <button
+              @click="showAddStackMenu = !showAddStackMenu"
+              :disabled="!isEventOpen"
+              class="p-1 bg-gold-500/10 hover:bg-gold-500/20 rounded-lg text-gold-500 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              :title="!isEventOpen ? 'Open or create an event first' : 'Add Stack'"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
+
+            <!-- Add Stack Type Menu -->
+            <div
+              v-if="showAddStackMenu && isEventOpen"
+              class="absolute top-full right-0 mt-2 bg-neutral-800 border border-neutral-700 rounded-lg shadow-xl py-1 min-w-[160px] z-50"
+            >
+              <button
+                @click="addNewStack(); showAddStackMenu = false"
+                class="w-full px-3 py-2 text-xs text-neutral-300 hover:bg-neutral-700 hover:text-gold-500 transition-all text-left flex items-center gap-2"
+              >
+                <span class="text-base">📄</span>
+                Normal Stack
+              </button>
+              <button
+                @click="openWorshipDialog(); showAddStackMenu = false"
+                class="w-full px-3 py-2 text-xs text-neutral-300 hover:bg-neutral-700 hover:text-purple-400 transition-all text-left flex items-center gap-2"
+              >
+                <span class="text-purple-400">🎵</span>
+                Worship Stack
+              </button>
+            </div>
+          </div>
         </div>
 
         <!-- Stacks List (scrollable) -->
@@ -597,14 +620,6 @@
           <span class="text-orange-400">🎬</span>
           Video
         </button>
-        <div class="border-t border-neutral-700 my-1"></div>
-        <button
-          @click="openWorshipDialog"
-          class="w-full px-3 py-2 text-left text-neutral-200 hover:bg-neutral-800 rounded-lg transition-all flex items-center gap-2 text-xs"
-        >
-          <span class="text-purple-400">🎵</span>
-          Worship Stack
-        </button>
       </div>
     </div>
 
@@ -947,6 +962,7 @@ const showImageAssetPicker = ref(false)
 const showVideoAssetPicker = ref(false)
 const showMonitorDialog = ref(false)
 const showAddSlideMenu = ref(false)
+const showAddStackMenu = ref(false)
 const showStackSettings = ref(false)
 const showInputDialog = ref(false)
 const inputDialogMode = ref('stack') // 'stack' only now
