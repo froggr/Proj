@@ -4,6 +4,7 @@
 
 import { ref, computed } from 'vue'
 import { parseChordPro } from '@/parsers/ChordProParser'
+import { parseOnSong } from '@/parsers/OnSongParser'
 import { useLibrary } from '@/composables/useLibrary'
 
 const songs = ref([])
@@ -15,22 +16,28 @@ const isLoaded = ref(false)
  */
 export async function loadSongs(libraryRoot) {
   if (!libraryRoot || !window.electronAPI?.loadSongs) {
+    console.warn('loadSongs: Missing libraryRoot or electronAPI')
     return
   }
 
   try {
+    console.log('loadSongs: Loading from', libraryRoot)
     const result = await window.electronAPI.loadSongs(libraryRoot)
+    console.log('loadSongs: Result:', result)
 
     if (result.success) {
       songs.value = result.data
       isLoaded.value = true
+      console.log('loadSongs: Loaded', songs.value.length, 'songs')
     } else {
       songs.value = []
       isLoaded.value = true
+      console.log('loadSongs: Failed to load songs:', result.error)
     }
   } catch (error) {
     songs.value = []
     isLoaded.value = true
+    console.error('loadSongs: Error:', error)
   }
 }
 
@@ -40,16 +47,25 @@ export async function loadSongs(libraryRoot) {
  */
 export async function saveSongs(libraryRoot) {
   if (!libraryRoot || !window.electronAPI?.saveSongs) {
+    console.error('saveSongs: Missing libraryRoot or electronAPI', { libraryRoot, hasAPI: !!window.electronAPI?.saveSongs })
     return
   }
 
   try {
-    const result = await window.electronAPI.saveSongs(libraryRoot, songs.value)
+    console.log('saveSongs: Saving', songs.value.length, 'songs to', libraryRoot)
+
+    // Strip out Vue reactivity by serializing to plain JSON
+    const plainSongs = JSON.parse(JSON.stringify(songs.value))
+
+    const result = await window.electronAPI.saveSongs(libraryRoot, plainSongs)
+    console.log('saveSongs: Save result:', result)
 
     if (!result.success) {
       throw new Error(result.error)
     }
+    console.log('saveSongs: Successfully saved', plainSongs.length, 'songs')
   } catch (error) {
+    console.error('saveSongs: Error:', error)
     throw error
   }
 }
@@ -61,6 +77,7 @@ export async function saveSongs(libraryRoot) {
  */
 export async function addSong(song, libraryRoot) {
   if (!libraryRoot) {
+    console.error('addSong: No library open')
     throw new Error('No library open')
   }
 
@@ -70,11 +87,15 @@ export async function addSong(song, libraryRoot) {
   // Remove any existing song with same ID
   const existingIndex = songs.value.findIndex(s => s.id === song.id)
   if (existingIndex !== -1) {
+    console.log('addSong: Replacing existing song with ID', song.id)
     songs.value.splice(existingIndex, 1)
   }
 
+  console.log('addSong: Adding song', song.title, 'to library')
   songs.value.push(song)
+  console.log('addSong: Total songs now:', songs.value.length)
   await saveSongs(libraryRoot)
+  console.log('addSong: Songs saved to disk')
   return song
 }
 
@@ -171,6 +192,11 @@ export async function importChordProFile(filePath, libraryRoot) {
     const fileName = result.filename.replace(/\.(txt|pro|chordpro)$/i, '')
     const song = parseChordPro(result.content, fileName)
 
+    // Validate parsed song has required fields
+    if (!song.processed_sections || song.processed_sections.length === 0) {
+      throw new Error('Failed to parse song sections')
+    }
+
     await addSong(song, libraryRoot)
     return { success: true, song }
   } catch (error) {
@@ -199,10 +225,13 @@ export async function importOnSongFile(filePath, libraryRoot) {
       throw new Error(result.error)
     }
 
-    // Simple OnSong parsing - treat similar to ChordPro for now
-    // Full parser can be added when needed with the grammar.js module
     const fileName = result.filename.replace(/\.onsong$/i, '')
-    const song = parseChordPro(result.content, fileName)
+    const song = parseOnSong(result.content, fileName)
+
+    // Validate parsed song has required fields
+    if (!song.processed_sections || song.processed_sections.length === 0) {
+      throw new Error('Failed to parse song sections')
+    }
 
     await addSong(song, libraryRoot)
     return { success: true, song }

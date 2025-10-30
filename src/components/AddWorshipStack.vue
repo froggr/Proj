@@ -28,8 +28,14 @@
 
         <!-- Song List -->
         <div class="max-h-64 overflow-y-auto bg-neutral-900 rounded-lg border border-neutral-700">
-          <div v-if="filteredSongs.length === 0" class="p-4 text-center text-neutral-500 text-sm">
-            No songs in library. Import songs first.
+          <div v-if="filteredSongs.length === 0" class="p-8 text-center">
+            <div class="text-neutral-500 text-sm mb-3">No songs in library yet.</div>
+            <button
+              @click="handleImportSongs"
+              class="px-4 py-2 bg-gold-500 hover:bg-gold-600 text-black rounded-lg text-sm font-medium transition-colors"
+            >
+              Import Songs
+            </button>
           </div>
           <div
             v-for="song in filteredSongs"
@@ -103,6 +109,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import Modal from './Modal.vue'
+import { useSongLibrary } from '@/library/SongLibrary'
 
 const props = defineProps({
   show: {
@@ -115,7 +122,9 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'add'])
+const emit = defineEmits(['close', 'add', 'songsImported'])
+
+const { browseSongFiles, importSongFiles } = useSongLibrary()
 
 const stackTitle = ref('Worship')
 const selectedSongs = ref([])
@@ -138,6 +147,24 @@ function toggleSong(songId) {
     selectedSongs.value.splice(index, 1)
   } else {
     selectedSongs.value.push(songId)
+  }
+}
+
+async function handleImportSongs() {
+  try {
+    const result = await browseSongFiles()
+
+    if (result.canceled || !result.files || result.files.length === 0) {
+      return
+    }
+
+    const importResult = await importSongFiles(result.files)
+
+    if (importResult.succeeded.length > 0) {
+      emit('songsImported')
+    }
+  } catch (error) {
+    // Error is already handled in SongLibrary
   }
 }
 

@@ -10,28 +10,43 @@ const currentSongIndex = ref(0) // Index in setlist
 const stagedSectionIndex = ref(0) // Currently staged section
 const liveSectionIndex = ref(null) // Currently live section (null = nothing live)
 
+// Debug logging
+import { watch } from 'vue'
+watch(liveSectionIndex, (newVal, oldVal) => {
+  console.log(`useWorship - liveSectionIndex changed: ${oldVal} -> ${newVal}`)
+  console.trace('Stack trace:')
+})
+
+watch(stagedSectionIndex, (newVal, oldVal) => {
+  console.log(`useWorship - stagedSectionIndex changed: ${oldVal} -> ${newVal}`)
+})
+
+watch(activeWorshipStack, (newVal) => {
+  console.log('useWorship - activeWorshipStack changed:', newVal)
+}, { deep: true })
+
 // Background video state
 const currentBackgroundVideo = ref(null) // Current video URL
 const nextBackgroundVideo = ref(null) // Next video URL for crossfade
 
 /**
- * Load a worship stack (called when clicking into a worship stack)
- * @param {Object} worshipStack - The worship stack data from presentation
+ * Load a worship stack (called when clicking a worship song slide)
+ * @param {Object} stackData - { currentSong, setlist, backgroundMode, backgroundVideos }
  */
-export function loadWorshipStack(worshipStack) {
-  activeWorshipStack.value = worshipStack
+export function loadWorshipStack(stackData) {
+  activeWorshipStack.value = stackData
   currentSongIndex.value = 0
   stagedSectionIndex.value = 0
   liveSectionIndex.value = null
 
-  // Load first song's background video if in per-song mode
-  if (worshipStack.backgroundMode === 'per-song') {
+  // Load background video if in per-song mode
+  if (stackData.backgroundMode === 'per-song') {
     loadBackgroundVideoForCurrentSong()
-  } else if (worshipStack.backgroundMode === 'auto-rotate') {
+  } else if (stackData.backgroundMode === 'auto-rotate') {
     // Pick random video from rotation list
-    if (worshipStack.backgroundVideos?.length > 0) {
-      const randomIndex = Math.floor(Math.random() * worshipStack.backgroundVideos.length)
-      currentBackgroundVideo.value = worshipStack.backgroundVideos[randomIndex]
+    if (stackData.backgroundVideos?.length > 0) {
+      const randomIndex = Math.floor(Math.random() * stackData.backgroundVideos.length)
+      currentBackgroundVideo.value = stackData.backgroundVideos[randomIndex]
     }
   }
 }
@@ -49,25 +64,30 @@ export function exitWorshipMode() {
 }
 
 /**
- * Get the current song from the setlist
+ * Get the current song
+ * @param {Function} findSongById - Function to find song by ID (pass from component)
  */
-export function useCurrentSong() {
-  const { findSongById } = useSongLibrary()
-
+export function useCurrentSong(findSongById) {
   const currentSong = computed(() => {
-    if (!activeWorshipStack.value || !activeWorshipStack.value.setlist) return null
-    const songId = activeWorshipStack.value.setlist[currentSongIndex.value]
-    return findSongById(songId)
+    if (!activeWorshipStack.value?.currentSong) return null
+
+    // If findSongById provided, use it to get full song data
+    if (findSongById && activeWorshipStack.value.currentSong.id) {
+      return findSongById(activeWorshipStack.value.currentSong.id)
+    }
+
+    // Otherwise return the song object directly
+    return activeWorshipStack.value.currentSong
   })
 
   const stagedSection = computed(() => {
-    if (!currentSong.value || !currentSong.value.sections) return null
-    return currentSong.value.sections[stagedSectionIndex.value]
+    if (!currentSong.value?.processed_sections) return null
+    return currentSong.value.processed_sections[stagedSectionIndex.value]
   })
 
   const liveSection = computed(() => {
     if (!currentSong.value || liveSectionIndex.value === null) return null
-    return currentSong.value.sections[liveSectionIndex.value]
+    return currentSong.value.processed_sections?.[liveSectionIndex.value]
   })
 
   return {
@@ -127,11 +147,10 @@ export function prevSong() {
  * @param {number} index - Section index
  */
 export function stageSection(index) {
-  const { currentSong } = useCurrentSong()
+  if (!activeWorshipStack.value?.currentSong?.processed_sections) return
 
-  if (!currentSong.value || !currentSong.value.sections) return
-
-  if (index >= 0 && index < currentSong.value.sections.length) {
+  const sections = activeWorshipStack.value.currentSong.processed_sections
+  if (index >= 0 && index < sections.length) {
     stagedSectionIndex.value = index
   }
 }
@@ -140,11 +159,10 @@ export function stageSection(index) {
  * Navigate to next section
  */
 export function nextSection() {
-  const { currentSong } = useCurrentSong()
+  if (!activeWorshipStack.value?.currentSong?.processed_sections) return
 
-  if (!currentSong.value || !currentSong.value.sections) return
-
-  if (stagedSectionIndex.value < currentSong.value.sections.length - 1) {
+  const sections = activeWorshipStack.value.currentSong.processed_sections
+  if (stagedSectionIndex.value < sections.length - 1) {
     stagedSectionIndex.value++
   }
 }
@@ -176,13 +194,12 @@ export function clearProjection() {
  * Load background video for current song (per-song mode)
  */
 function loadBackgroundVideoForCurrentSong() {
-  const { currentSong } = useCurrentSong()
-
-  if (!currentSong.value) return
+  const currentSong = activeWorshipStack.value?.currentSong
+  if (!currentSong) return
 
   // Check if song has a background video assigned
-  if (currentSong.value.presentation?.backgroundVideo) {
-    currentBackgroundVideo.value = currentSong.value.presentation.backgroundVideo
+  if (currentSong.presentation?.backgroundVideo) {
+    currentBackgroundVideo.value = currentSong.presentation.backgroundVideo
   } else {
     // Fallback to first video in rotation list if available
     if (activeWorshipStack.value?.backgroundVideos?.length > 0) {
@@ -215,17 +232,21 @@ function rotateBackgroundVideo() {
 
 /**
  * Get setlist with song details
+ * @param {Function} findSongById - Function to find song by ID (pass from component)
  */
-export function useSetlist() {
-  const { findSongById } = useSongLibrary()
-
+export function useSetlist(findSongById) {
   const setlist = computed(() => {
     if (!activeWorshipStack.value?.setlist) return []
 
-    return activeWorshipStack.value.setlist.map((songId, index) => {
-      const song = findSongById(songId)
+    return activeWorshipStack.value.setlist.map((songOrId, index) => {
+      // Handle both song objects and IDs
+      let song = songOrId
+      if (typeof songOrId === 'string' && findSongById) {
+        song = findSongById(songOrId)
+      }
+
       return {
-        id: songId,
+        id: song?.id || songOrId,
         index,
         title: song?.title || 'Unknown Song',
         artist: song?.artist || '',
@@ -251,12 +272,11 @@ export function isWorshipModeActive() {
  * Get navigation constraints
  */
 export function useWorshipNavigation() {
-  const { currentSong } = useCurrentSong()
-
   const canGoPrevSection = computed(() => stagedSectionIndex.value > 0)
   const canGoNextSection = computed(() => {
-    if (!currentSong.value?.sections) return false
-    return stagedSectionIndex.value < currentSong.value.sections.length - 1
+    const sections = activeWorshipStack.value?.currentSong?.processed_sections
+    if (!sections) return false
+    return stagedSectionIndex.value < sections.length - 1
   })
 
   const canGoPrevSong = computed(() => currentSongIndex.value > 0)
@@ -273,7 +293,11 @@ export function useWorshipNavigation() {
   }
 }
 
-export function useWorship() {
+/**
+ * Main worship composable
+ * @param {Function} findSongById - Optional function to find song by ID
+ */
+export function useWorship(findSongById) {
   return {
     // State
     activeWorshipStack,
@@ -284,8 +308,8 @@ export function useWorship() {
     nextBackgroundVideo,
 
     // Computed
-    ...useCurrentSong(),
-    ...useSetlist(),
+    ...useCurrentSong(findSongById),
+    ...useSetlist(findSongById),
     ...useWorshipNavigation(),
     isWorshipModeActive: isWorshipModeActive(),
 

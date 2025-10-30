@@ -81,7 +81,10 @@ export function usePresentation() {
         ? stacks.value[newStackIndex]?.autoAdvance?.transition || 'none'
         : 'none'
 
-      updateProjector(liveSlide, transitionType)
+      // Skip projection for song slides - they're handled by worship mode in ControlView
+      if (liveSlide?.type !== 'song') {
+        updateProjector(liveSlide, transitionType)
+      }
 
       // Handle auto-advance if enabled
       if (liveSlide && newStackIndex !== null) {

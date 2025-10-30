@@ -1,226 +1,148 @@
 <template>
-  <div class="flex h-full bg-neutral-900">
-    <!-- Left Panel: Setlist -->
-    <div class="w-80 border-r border-neutral-800 flex flex-col">
-      <div class="p-4 border-b border-neutral-800">
-        <h2 class="text-lg font-semibold text-gold-500">Setlist</h2>
-      </div>
-
-      <div class="flex-1 overflow-y-auto">
-        <div
-          v-for="(song, index) in setlist"
-          :key="song.id"
-          @click="goToSong(index)"
-          class="p-4 border-b border-neutral-800 cursor-pointer transition-colors"
-          :class="{
-            'bg-gold-500/20 border-l-4 border-l-gold-500': song.isCurrent,
-            'hover:bg-neutral-800': !song.isCurrent
-          }"
-        >
-          <div class="font-medium text-white">{{ song.title }}</div>
-          <div v-if="song.artist" class="text-sm text-neutral-400 mt-1">
-            {{ song.artist }}
+  <!-- Just the middle section grid - left panel (songs) is handled by ControlView -->
+  <!-- Section Grid (replaces slide thumbnails in normal mode) -->
+  <div class="flex-1 bg-neutral-900/50 backdrop-blur rounded-xl border border-neutral-800 flex flex-col overflow-hidden">
+      <!-- Header with song info -->
+      <div class="p-4 border-b border-neutral-800/50 flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-4">
+          <div>
+            <h2 class="text-lg font-semibold text-white">
+              {{ currentSong?.title || 'No Song Selected' }}
+            </h2>
+            <div v-if="currentSong" class="flex items-center gap-3 text-xs text-neutral-400 mt-1">
+              <span v-if="currentSong.artist">{{ currentSong.artist }}</span>
+              <span v-if="currentSong.key" class="text-neutral-500">•</span>
+              <span v-if="currentSong.key">{{ currentSong.key }}</span>
+              <span v-if="currentSong.tempo" class="text-neutral-500">•</span>
+              <span v-if="currentSong.tempo">{{ currentSong.tempo }} BPM</span>
+            </div>
           </div>
         </div>
 
-        <div v-if="setlist.length === 0" class="p-8 text-center text-neutral-500">
-          No songs in setlist
-        </div>
-      </div>
-    </div>
-
-    <!-- Middle Panel: Section Selector -->
-    <div class="flex-1 flex flex-col">
-      <div class="p-4 border-b border-neutral-800 flex items-center justify-between">
-        <div>
-          <h2 class="text-lg font-semibold text-white">
-            {{ currentSong?.title || 'No Song Selected' }}
-          </h2>
-          <div v-if="currentSong?.artist" class="text-sm text-neutral-400 mt-1">
-            {{ currentSong.artist }}
-          </div>
-        </div>
-
-        <!-- Song Navigation -->
-        <div class="flex gap-2">
+        <!-- Section navigation controls -->
+        <div class="flex items-center gap-2">
           <button
-            @click="prevSong"
-            :disabled="!canGoPrevSong"
-            class="px-3 py-2 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            :class="canGoPrevSong ? 'bg-neutral-800 hover:bg-neutral-700 text-white' : 'bg-neutral-800 text-neutral-600'"
-            title="Previous Song (Page Up)"
+            @click="prevSection"
+            :disabled="!canGoPrevSection"
+            class="p-2 bg-neutral-800 hover:bg-neutral-700 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Previous Section (←)"
           >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-4 h-4 text-neutral-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
             </svg>
           </button>
           <button
-            @click="nextSong"
-            :disabled="!canGoNextSong"
-            class="px-3 py-2 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            :class="canGoNextSong ? 'bg-neutral-800 hover:bg-neutral-700 text-white' : 'bg-neutral-800 text-neutral-600'"
-            title="Next Song (Page Down)"
+            @click="goLive"
+            :disabled="!stagedSection"
+            class="px-4 py-2 bg-gold-500 hover:bg-gold-600 text-black text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Go Live (Space)"
           >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            GO LIVE
+          </button>
+          <button
+            @click="nextSection"
+            :disabled="!canGoNextSection"
+            class="p-2 bg-neutral-800 hover:bg-neutral-700 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Next Section (→)"
+          >
+            <svg class="w-4 h-4 text-neutral-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+          <button
+            @click="$emit('clear')"
+            class="p-2 bg-neutral-800 hover:bg-neutral-700 rounded-lg transition-colors"
+            title="Clear (Esc)"
+          >
+            <svg class="w-4 h-4 text-neutral-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
       </div>
 
-      <div class="flex-1 overflow-y-auto p-6">
-        <div v-if="currentSong?.sections" class="space-y-4">
+      <!-- Section Grid (like DongleControl) -->
+      <div class="flex-1 overflow-y-auto p-4">
+        <div v-if="currentSong?.processed_sections" class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           <div
-            v-for="(section, index) in currentSong.sections"
-            :key="index"
+            v-for="(section, index) in currentSong.processed_sections"
+            :key="`${currentSong._renderKey || 0}-${index}`"
             @click="stageSection(index)"
-            class="p-6 rounded-lg border-2 cursor-pointer transition-all"
+            class="bg-neutral-800/30 rounded-lg border-2 cursor-pointer transition-all hover:border-neutral-600 overflow-hidden"
             :class="{
-              'border-yellow-400 bg-yellow-400/10': index === stagedSectionIndex,
-              'border-green-500 bg-green-500/10': index === liveSectionIndex,
-              'border-neutral-700 bg-neutral-800/50 hover:border-neutral-600': index !== stagedSectionIndex && index !== liveSectionIndex
+              'border-yellow-400 shadow-lg shadow-yellow-400/20': index === stagedSectionIndex,
+              'border-green-500 shadow-lg shadow-green-500/20': index === liveSectionIndex,
+              'border-neutral-700/50': index !== stagedSectionIndex && index !== liveSectionIndex
             }"
           >
-            <!-- Section Title -->
-            <div class="flex items-center justify-between mb-3">
-              <div class="font-semibold text-white">{{ section.title }}</div>
-              <div class="flex items-center gap-2">
-                <span
-                  v-if="index === liveSectionIndex"
-                  class="px-2 py-1 rounded text-xs font-medium bg-green-500 text-black"
-                >
-                  LIVE
-                </span>
-                <span
-                  v-if="index === stagedSectionIndex"
-                  class="px-2 py-1 rounded text-xs font-medium bg-yellow-400 text-black"
-                >
-                  STAGED
-                </span>
-              </div>
+            <!-- Section Title with color coding -->
+            <div
+              class="px-3 py-2 font-semibold text-sm border-b"
+              :class="{
+                'bg-emerald-900/30 border-emerald-800/50 text-emerald-400': section.title.toLowerCase().includes('verse'),
+                'bg-red-900/30 border-red-800/50 text-red-400': section.title.toLowerCase().includes('chorus'),
+                'bg-purple-900/30 border-purple-800/50 text-purple-400': section.title.toLowerCase().includes('bridge'),
+                'bg-cyan-900/30 border-cyan-800/50 text-cyan-400': section.title.toLowerCase().includes('intro') || section.title.toLowerCase().includes('outro'),
+                'bg-orange-900/30 border-orange-800/50 text-orange-400': section.title.toLowerCase().includes('instrumental'),
+                'bg-neutral-800/50 border-neutral-700/50 text-neutral-400': !section.title.toLowerCase().match(/verse|chorus|bridge|intro|outro|instrumental/)
+              }"
+            >
+              {{ section.title }}
             </div>
 
             <!-- Lyrics Preview (no chords) -->
-            <div class="space-y-2 text-neutral-300 text-sm">
-              <div
-                v-for="(line, lineIndex) in section.lines.slice(0, 3)"
-                :key="lineIndex"
-                class="flex flex-wrap gap-1"
-              >
-                <span v-for="(pair, pairIndex) in line" :key="pairIndex">
-                  {{ pair[1] }}
-                </span>
-              </div>
-              <div v-if="section.lines.length > 3" class="text-neutral-500 italic">
-                ...
+            <div class="p-3 text-xs text-neutral-300 leading-relaxed space-y-1 max-h-32 overflow-hidden">
+              <div v-for="(line, lineIndex) in section.lines" :key="lineIndex" class="whitespace-pre-wrap">
+                <span v-for="(pair, pairIndex) in line" :key="pairIndex">{{ pair[1] }}</span>
               </div>
             </div>
           </div>
         </div>
 
-        <div v-else class="flex items-center justify-center h-full text-neutral-500">
-          Select a song from the setlist
-        </div>
-      </div>
-
-      <!-- Control Toolbar -->
-      <div class="p-4 border-t border-neutral-800 flex items-center justify-between">
-        <div class="flex gap-3">
-          <button
-            @click="prevSection"
-            :disabled="!canGoPrevSection"
-            class="px-4 py-2 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            :class="canGoPrevSection ? 'bg-neutral-800 hover:bg-neutral-700 text-white' : 'bg-neutral-800 text-neutral-600'"
-            title="Previous Section (←)"
-          >
-            ← Prev
-          </button>
-          <button
-            @click="nextSection"
-            :disabled="!canGoNextSection"
-            class="px-4 py-2 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            :class="canGoNextSection ? 'bg-neutral-800 hover:bg-neutral-700 text-white' : 'bg-neutral-800 text-neutral-600'"
-            title="Next Section (→)"
-          >
-            Next →
-          </button>
-        </div>
-
-        <div class="flex gap-3">
-          <button
-            @click="clearProjection"
-            class="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-white transition-colors"
-            title="Clear (Esc)"
-          >
-            Clear
-          </button>
-          <button
-            @click="goLive"
-            class="px-6 py-2 rounded-lg bg-gold-500 hover:bg-gold-600 text-black font-semibold transition-colors"
-            title="Go Live (Space)"
-          >
-            GO LIVE
-          </button>
+        <!-- Empty State -->
+        <div v-else class="flex items-center justify-center h-full text-center text-neutral-500">
+          <div>
+            <svg class="w-16 h-16 text-neutral-700 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+            </svg>
+            <h3 class="text-sm font-semibold text-neutral-500 mb-2">No Song Selected</h3>
+            <p class="text-xs text-neutral-600">Select a song from the worship stack</p>
+          </div>
         </div>
       </div>
     </div>
-
-    <!-- Right Panel: Live Preview -->
-    <div class="w-96 border-l border-neutral-800 flex flex-col">
-      <div class="p-4 border-b border-neutral-800">
-        <h2 class="text-lg font-semibold text-green-500">Live Output</h2>
-      </div>
-
-      <div class="flex-1 bg-black flex items-center justify-center">
-        <WorshipProjector
-          :section="liveSection"
-          :background-video="currentBackgroundVideo"
-          :next-background-video="nextBackgroundVideo"
-          :text-scale="textScale"
-          :library-root="libraryRoot"
-          :show-section-title="false"
-          :video-opacity="0.5"
-        />
-      </div>
-    </div>
-  </div>
 </template>
 
 <script setup>
+import { watch } from 'vue'
 import { useWorship } from '@/composables/useWorship'
-import WorshipProjector from './WorshipProjector.vue'
 
-const props = defineProps({
-  textScale: {
-    type: Number,
-    default: 100
-  },
-  libraryRoot: {
-    type: String,
-    default: null
-  }
-})
+defineEmits(['clear'])
 
 const {
-  setlist,
   currentSong,
   stagedSectionIndex,
   liveSectionIndex,
-  stagedSection,
-  liveSection,
-  currentBackgroundVideo,
-  nextBackgroundVideo,
   canGoPrevSection,
   canGoNextSection,
-  canGoPrevSong,
-  canGoNextSong,
-  goToSong,
-  nextSong,
-  prevSong,
   stageSection,
   nextSection,
   prevSection,
-  goLive,
-  clearProjection
+  goLive
 } = useWorship()
+
+// Debug: Log current song data
+watch(currentSong, (newSong) => {
+  console.log('WorshipControl - currentSong changed:', newSong)
+  console.log('WorshipControl - processed_sections:', newSong?.processed_sections)
+  console.log('WorshipControl - processed_sections length:', newSong?.processed_sections?.length)
+}, { immediate: true, deep: true })
+
+watch(stagedSectionIndex, (newIndex) => {
+  console.log('WorshipControl - stagedSectionIndex:', newIndex)
+}, { immediate: true })
+
+watch(liveSectionIndex, (newIndex) => {
+  console.log('WorshipControl - liveSectionIndex:', newIndex)
+}, { immediate: true })
 </script>

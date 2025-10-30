@@ -48,6 +48,15 @@
             @ended="onYouTubeEnded"
           />
 
+          <!-- Worship Section (song lyrics) -->
+          <WorshipSectionProjector
+            v-else-if="slide && slide.type === 'worship-section'"
+            :slide="slide"
+            :library-root="libraryRoot"
+            :text-scale="textScale"
+            :is-preview="false"
+          />
+
           <!-- Empty (black screen) -->
           <div v-else class="w-full h-full bg-black"></div>
         </div>
@@ -61,6 +70,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import SlideRenderer from './SlideRenderer.vue'
 import VideoPlayer from './VideoPlayer.vue'
 import YouTubePlayer from './YouTubePlayer.vue'
+import WorshipSectionProjector from './WorshipSectionProjector.vue'
 
 const props = defineProps({
   slide: {
@@ -94,6 +104,7 @@ const slideKey = computed(() => {
   if (props.slide.type === 'custom') return `custom-${props.slide.html?.substring(0, 20)}`
   if (props.slide.type === 'youtube') return `youtube-${props.slide.videoId}`
   if (props.slide.type === 'video') return `video-${props.slide.videoUrl}`
+  if (props.slide.type === 'worship-section') return `worship-${props.slide.songTitle}-${props.slide.sectionData.title}`
   return `slide-${props.slide.type}`
 })
 

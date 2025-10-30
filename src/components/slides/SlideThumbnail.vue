@@ -45,6 +45,12 @@
       </div>
     </div>
 
+    <!-- Song: Show song title with music icon -->
+    <div v-else-if="slide.type === 'song'" class="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-purple-900/30 to-purple-950/30 p-2">
+      <div class="text-purple-400 text-lg mb-1">🎵</div>
+      <div class="text-neutral-200 text-[10px] font-medium text-center line-clamp-2">{{ slide.title }}</div>
+    </div>
+
     <!-- Unknown type -->
     <div v-else class="text-gray-500 text-xs flex items-center justify-center h-full">
       {{ slide.type || 'Unknown' }}

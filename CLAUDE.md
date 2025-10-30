@@ -65,8 +65,8 @@ Church Presenter App - A volunteer-friendly church presentation software alterna
 - **Delete more than you add**: Question every line. Can this be simpler?
 - **Refactor as you go**: See duplication? Extract it immediately.
 - **Name things clearly**: `stagedIndex` is better than `idx1` or `currentSlide`.
-- **Component size limit**: If a component exceeds 150 lines, it's doing too much. Split it.
-- **Function size limit**: If a function exceeds 20 lines, it probably violates SRP. Split it.
+- **Component size limit**: If a component exceeds 250-500 lines, it's doing too much. Split it.
+- **Function size limit**: If a function exceeds 40-80 lines, it probably violates SRP. Split it.
 
 ### Code Review Checklist
 Before committing, ask:

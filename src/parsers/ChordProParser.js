@@ -66,16 +66,26 @@ export function parseChordPro(data, filename = 'Untitled') {
     sections.push(currentSection)
   }
 
+  // Generate processed_sections for DongleControl-compatible rendering
+  const processed_sections = sections.map(section => ({
+    title: section.title,
+    lines: section.lines || []
+  }))
+
   return {
     id: Date.now().toString(),
     title,
     artist,
     key: key || 'C',
+    current_key: key || 'C', // Used for transposition
     tempo,
-    timeSignature,
+    time_signature: timeSignature,
     ccli,
-    sections,
-    arrangement: sections.map(s => ({ title: s.title }))
+    nashville: 0, // Nashville number system disabled by default
+    sections, // Keep original for backwards compatibility
+    processed_sections, // DongleControl-compatible format
+    arrangement: sections.map(s => ({ title: s.title })),
+    _renderKey: Date.now() // Force re-render when song changes
   }
 }
 
