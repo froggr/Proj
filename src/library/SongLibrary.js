@@ -15,7 +15,6 @@ const isLoaded = ref(false)
  */
 export async function loadSongs(libraryRoot) {
   if (!libraryRoot || !window.electronAPI?.loadSongs) {
-    console.warn('Cannot load songs: invalid library root or missing Electron API')
     return
   }
 
@@ -25,14 +24,11 @@ export async function loadSongs(libraryRoot) {
     if (result.success) {
       songs.value = result.data
       isLoaded.value = true
-      console.log(`Loaded ${songs.value.length} songs from library`)
     } else {
-      console.error('Failed to load songs:', result.error)
       songs.value = []
       isLoaded.value = true
     }
   } catch (error) {
-    console.error('Error loading songs:', error)
     songs.value = []
     isLoaded.value = true
   }
@@ -44,21 +40,16 @@ export async function loadSongs(libraryRoot) {
  */
 export async function saveSongs(libraryRoot) {
   if (!libraryRoot || !window.electronAPI?.saveSongs) {
-    console.warn('Cannot save songs: invalid library root or missing Electron API')
     return
   }
 
   try {
     const result = await window.electronAPI.saveSongs(libraryRoot, songs.value)
 
-    if (result.success) {
-      console.log(`Saved ${songs.value.length} songs to library`)
-    } else {
-      console.error('Failed to save songs:', result.error)
+    if (!result.success) {
       throw new Error(result.error)
     }
   } catch (error) {
-    console.error('Error saving song library:', error)
     throw error
   }
 }
@@ -183,7 +174,6 @@ export async function importChordProFile(filePath, libraryRoot) {
     await addSong(song, libraryRoot)
     return { success: true, song }
   } catch (error) {
-    console.error('Error importing ChordPro file:', error)
     return { success: false, error: error.message }
   }
 }
@@ -217,7 +207,6 @@ export async function importOnSongFile(filePath, libraryRoot) {
     await addSong(song, libraryRoot)
     return { success: true, song }
   } catch (error) {
-    console.error('Error importing OnSong file:', error)
     return { success: false, error: error.message }
   }
 }

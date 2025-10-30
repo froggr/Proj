@@ -1022,7 +1022,6 @@ function toggleStack(stackIndex) {
 }
 
 function addNewStack() {
-  console.log('addNewStack called!')
   inputDialogMode.value = 'stack'
   showInputDialog.value = true
 }
@@ -1034,7 +1033,6 @@ async function handleNewStackConfirm(title) {
   }
 
   // Just creating a new stack
-  console.log('Creating new stack:', title)
   addStack(title)
 
   showInputDialog.value = false
@@ -1072,8 +1070,6 @@ function openWorshipDialog() {
 }
 
 function handleAddWorshipStack(worshipData) {
-  console.log('Adding worship stack:', worshipData)
-
   // Create a new stack
   const stackId = addStack(worshipData.title)
 
