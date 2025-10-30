@@ -1169,6 +1169,7 @@
         :asset-type="'video'"
         :title="'Select Background Video'"
         :multi-select="false"
+        :category="'backgrounds'"
         @close="showSongBackgroundVideoPicker = false; showSongDialog = true"
         @select="handleSongBackgroundVideoSelected"
     />

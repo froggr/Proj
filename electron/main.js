@@ -672,7 +672,7 @@ ipcMain.handle('select-library-folder', async () => {
 })
 
 // List all assets in the library
-ipcMain.handle('list-library-assets', async (event, libPath) => {
+ipcMain.handle('list-library-assets', async (event, libPath, categoryFilter = null) => {
   try {
     if (!libPath) {
       return { success: false, assets: [] }
@@ -683,7 +683,7 @@ ipcMain.handle('list-library-assets', async (event, libPath) => {
     const videoExtensions = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv']
 
     // Helper function to recursively scan directories
-    function scanDirectory(dirPath, urlPrefix) {
+    function scanDirectory(dirPath, urlPrefix, category) {
       if (!fs.existsSync(dirPath)) return
 
       const items = fs.readdirSync(dirPath, { withFileTypes: true })
@@ -696,7 +696,7 @@ ipcMain.handle('list-library-assets', async (event, libPath) => {
           // Recursively scan subdirectories
           const subPath = path.join(dirPath, item.name)
           const subUrlPrefix = `${urlPrefix}${item.name}/`
-          scanDirectory(subPath, subUrlPrefix)
+          scanDirectory(subPath, subUrlPrefix, category)
         } else if (item.isFile()) {
           const ext = item.name.split('.').pop().toLowerCase()
           const assetPath = path.join(dirPath, item.name)
@@ -714,7 +714,8 @@ ipcMain.handle('list-library-assets', async (event, libPath) => {
               filename: item.name,
               path: assetPath,
               url: assetUrl,
-              type: assetType
+              type: assetType,
+              category
             }
 
             // For videos, check if thumbnail exists
@@ -732,13 +733,21 @@ ipcMain.handle('list-library-assets', async (event, libPath) => {
       }
     }
 
-    // Scan branding folder
-    const brandingPath = path.join(libPath, 'assets', 'branding')
-    scanDirectory(brandingPath, 'assets://branding/')
+    // Scan folders based on category filter
+    if (!categoryFilter || categoryFilter === 'branding') {
+      const brandingPath = path.join(libPath, 'assets', 'branding')
+      scanDirectory(brandingPath, 'assets://branding/', 'branding')
+    }
 
-    // Scan media folder
-    const mediaPath = path.join(libPath, 'assets', 'media')
-    scanDirectory(mediaPath, 'assets://media/')
+    if (!categoryFilter || categoryFilter === 'media') {
+      const mediaPath = path.join(libPath, 'assets', 'media')
+      scanDirectory(mediaPath, 'assets://media/', 'media')
+    }
+
+    if (!categoryFilter || categoryFilter === 'backgrounds') {
+      const backgroundsPath = path.join(libPath, 'assets', 'backgrounds')
+      scanDirectory(backgroundsPath, 'assets://backgrounds/', 'backgrounds')
+    }
 
     return { success: true, assets }
   } catch (error) {
@@ -892,7 +901,7 @@ ipcMain.handle('delete-library-asset', async (event, libPath, assetPath) => {
 })
 
 // Browse for assets without importing (for preview)
-ipcMain.handle('browse-for-assets', async (event, assetType) => {
+ipcMain.handle('browse-for-assets', async (event, assetType, category = 'media') => {
   try {
     // Determine file filters based on asset type
     let filters = []
@@ -934,11 +943,12 @@ ipcMain.handle('browse-for-assets', async (event, assetType) => {
       return {
         filename,
         path: filePath,
-        type
+        type,
+        category
       }
     })
 
-    return { success: true, files }
+    return { success: true, files, category }
   } catch (error) {
     console.error('Browse for assets failed:', error)
     return { success: false, error: error.message }
@@ -955,10 +965,6 @@ ipcMain.handle('import-assets-with-thumbnails', async (event, libPath, assets) =
     // Get current year-month for organization
     const now = new Date()
     const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-    const targetDir = path.join(libPath, 'assets', 'media', yearMonth)
-
-    // Create target directory if it doesn't exist
-    fs.mkdirSync(targetDir, { recursive: true })
 
     // Ensure .thumbnails directory exists
     const thumbnailsDir = path.join(libPath, 'assets', '.thumbnails')
@@ -970,19 +976,33 @@ ipcMain.handle('import-assets-with-thumbnails', async (event, libPath, assets) =
     for (const asset of assets) {
       const filename = asset.filename
       const sourcePath = asset.path
+      const category = asset.category || 'media' // Default to 'media' for backward compatibility
+
+      // Determine target directory based on category
+      // backgrounds: assets/backgrounds/
+      // media: assets/media/{year-month}/
+      let targetDir, assetUrl
+      if (category === 'backgrounds') {
+        targetDir = path.join(libPath, 'assets', 'backgrounds')
+        fs.mkdirSync(targetDir, { recursive: true })
+        assetUrl = `assets://backgrounds/${filename}`
+      } else {
+        targetDir = path.join(libPath, 'assets', 'media', yearMonth)
+        fs.mkdirSync(targetDir, { recursive: true })
+        assetUrl = `assets://media/${yearMonth}/${filename}`
+      }
+
       const targetPath = path.join(targetDir, filename)
 
       // Copy file to library
       fs.copyFileSync(sourcePath, targetPath)
 
-      // Create asset URL
-      const assetUrl = `assets://media/${yearMonth}/${filename}`
-
       const importedAsset = {
         filename,
         path: targetPath,
         url: assetUrl,
-        type: asset.type
+        type: asset.type,
+        category
       }
 
       // Save thumbnail if video and thumbnailDataUrl exists

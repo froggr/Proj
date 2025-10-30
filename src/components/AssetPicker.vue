@@ -338,6 +338,11 @@ const props = defineProps({
   multiSelect: {
     type: Boolean,
     default: false
+  },
+  category: {
+    type: String,
+    default: 'media', // 'media', 'backgrounds', or 'branding'
+    validator: (value) => ['media', 'backgrounds', 'branding'].includes(value)
   }
 })
 
@@ -386,7 +391,7 @@ async function loadLibraryAssets() {
 
   loading.value = true
   try {
-    const result = await window.electronAPI.listLibraryAssets(props.libraryRoot)
+    const result = await window.electronAPI.listLibraryAssets(props.libraryRoot, props.category)
     if (result.success) {
       assets.value = result.assets
     }
@@ -401,7 +406,7 @@ async function browseForFiles() {
   if (!window.electronAPI || !props.libraryRoot) return
 
   // Step 1: Browse for files (no import yet)
-  const browseResult = await window.electronAPI.browseForAssets(props.assetType)
+  const browseResult = await window.electronAPI.browseForAssets(props.assetType, props.category)
   if (!browseResult.success || browseResult.canceled || browseResult.files.length === 0) {
     return
   }
@@ -471,10 +476,18 @@ async function confirmImport() {
   loading.value = true
 
   try {
-    // Step 5: Import files and save thumbnails
+    // Step 5: Create plain objects without Vue reactivity wrappers
+    const plainAssets = previewAssets.value.map(asset => ({
+      filename: asset.filename,
+      path: asset.path,
+      type: asset.type,
+      thumbnailDataUrl: asset.thumbnailDataUrl || null
+    }))
+
+    // Import files and save thumbnails
     const result = await window.electronAPI.importAssetsWithThumbnails(
       props.libraryRoot,
-      previewAssets.value
+      plainAssets
     )
 
     if (result.success && result.assets.length > 0) {

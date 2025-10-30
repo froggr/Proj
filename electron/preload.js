@@ -83,9 +83,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectLibraryFolder: () => ipcRenderer.invoke('select-library-folder'),
 
   // Asset management
-  listLibraryAssets: (libPath) => ipcRenderer.invoke('list-library-assets', libPath),
+  listLibraryAssets: (libPath, categoryFilter) => ipcRenderer.invoke('list-library-assets', libPath, categoryFilter),
   importAssetsToLibrary: (libPath, assetType) => ipcRenderer.invoke('import-assets-to-library', libPath, assetType),
-  browseForAssets: (assetType) => ipcRenderer.invoke('browse-for-assets', assetType),
+  browseForAssets: (assetType, category) => ipcRenderer.invoke('browse-for-assets', assetType, category),
   importAssetsWithThumbnails: (libPath, assets) => ipcRenderer.invoke('import-assets-with-thumbnails', libPath, assets),
   saveVideoThumbnail: (libPath, videoUrl, thumbnailDataUrl) => ipcRenderer.invoke('save-video-thumbnail', libPath, videoUrl, thumbnailDataUrl),
   checkAssetUsage: (libPath, assetUrl) => ipcRenderer.invoke('check-asset-usage', libPath, assetUrl),
