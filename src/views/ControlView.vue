@@ -936,8 +936,6 @@ const {
 // Worship mode
 const {
   isWorshipModeActive,
-  currentSong: worshipCurrentSong,
-  liveSection: worshipLiveSection,
   nextSong: worshipNextSong,
   prevSong: worshipPrevSong,
   nextSection: worshipNextSection,
