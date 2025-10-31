@@ -88,6 +88,18 @@
         </select>
       </div>
 
+      <!-- Font Color -->
+      <div>
+        <label class="block text-sm font-medium text-neutral-300 mb-2">Font Color</label>
+        <select
+          v-model="formData.fontColor"
+          class="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 text-sm focus:outline-none focus:border-gold-500"
+        >
+          <option value="light">Light (White)</option>
+          <option value="dark">Dark (Black)</option>
+        </select>
+      </div>
+
       <!-- Lines Per Section -->
       <div>
         <label class="block text-sm font-medium text-neutral-300 mb-2">
@@ -142,6 +154,7 @@ const formData = ref({
   backgroundOpacity: 0.4,
   fontFamily: 'Inter, sans-serif',
   fontWeight: 600,
+  fontColor: 'light',
   linesPerSection: 4
 })
 
@@ -156,6 +169,7 @@ watch(() => props.slide, (newSlide) => {
       backgroundOpacity: newSlide.backgroundOpacity || 0.4,
       fontFamily: newSlide.fontFamily || 'Inter, sans-serif',
       fontWeight: newSlide.fontWeight || 600,
+      fontColor: newSlide.fontColor || 'light',
       linesPerSection: newSlide.linesPerSection || 4
     }
     songTitle.value = newSlide.title || 'Song'

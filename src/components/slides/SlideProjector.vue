@@ -104,7 +104,8 @@ const slideKey = computed(() => {
   if (props.slide.type === 'custom') return `custom-${props.slide.html?.substring(0, 20)}`
   if (props.slide.type === 'youtube') return `youtube-${props.slide.videoId}`
   if (props.slide.type === 'video') return `video-${props.slide.videoUrl}`
-  if (props.slide.type === 'worship-section') return `worship-${props.slide.songTitle}-${props.slide.sectionData.title}`
+  // For worship sections, use only songTitle so background persists across sections
+  if (props.slide.type === 'worship-section') return `worship-${props.slide.songTitle}`
   return `slide-${props.slide.type}`
 })
 

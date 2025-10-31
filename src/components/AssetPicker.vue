@@ -481,6 +481,7 @@ async function confirmImport() {
       filename: asset.filename,
       path: asset.path,
       type: asset.type,
+      category: asset.category || props.category, // Include category for proper directory routing
       thumbnailDataUrl: asset.thumbnailDataUrl || null
     }))
 

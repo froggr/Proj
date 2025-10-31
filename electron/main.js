@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, screen, dialog, Menu, protocol } = require(
 const path = require('path')
 const fs = require('fs')
 const { setupRemoteServer, broadcastStateUpdate, closeRemoteServer } = require('./remoteServer')
+const { optimizeVideoInPlace } = require('./videoOptimizer')
 
 // Settings store will be initialized asynchronously (ESM module)
 let settingsStore = null
@@ -481,6 +482,7 @@ ipcMain.handle('create-library', async (event, parentPath, libraryName) => {
     fs.mkdirSync(libraryPath, { recursive: true })
     fs.mkdirSync(path.join(libraryPath, 'assets', 'branding'), { recursive: true })
     fs.mkdirSync(path.join(libraryPath, 'assets', 'media'), { recursive: true })
+    fs.mkdirSync(path.join(libraryPath, 'assets', 'backgrounds'), { recursive: true })
     fs.mkdirSync(path.join(libraryPath, 'assets', '.trash'), { recursive: true })
     fs.mkdirSync(path.join(libraryPath, 'assets', '.thumbnails'), { recursive: true })
     fs.mkdirSync(path.join(libraryPath, 'events'), { recursive: true })
@@ -997,6 +999,28 @@ ipcMain.handle('import-assets-with-thumbnails', async (event, libPath, assets) =
       // Copy file to library
       fs.copyFileSync(sourcePath, targetPath)
 
+      // Optimize video for web playback (move moov atom to beginning)
+      if (asset.type === 'video') {
+        console.log(`Optimizing video for playback: ${filename}`)
+        try {
+          const optimizeResult = await optimizeVideoInPlace(targetPath, (percent) => {
+            console.log(`Optimizing ${filename}: ${percent}%`)
+          })
+
+          if (!optimizeResult.success && !optimizeResult.skipped) {
+            console.warn(`Failed to optimize ${filename}: ${optimizeResult.error}`)
+            console.warn('Video may not play correctly in projector')
+          } else if (optimizeResult.skipped) {
+            console.log(`Video ${filename} does not need optimization`)
+          } else {
+            console.log(`Video ${filename} optimized successfully`)
+          }
+        } catch (optimizeError) {
+          console.error(`Error optimizing video ${filename}:`, optimizeError)
+          console.warn('Video may not play correctly in projector')
+        }
+      }
+
       const importedAsset = {
         filename,
         path: targetPath,
@@ -1098,9 +1122,10 @@ app.whenReady().then(async () => {
     const logMsg = `local-image protocol request: ${request.url}`
     console.log(logMsg)
     sendLogToRenderer(logMsg)
-    
+
     // Parse the URL properly to handle Windows paths
     let filePath = decodeURIComponent(request.url.replace('local-image://', ''))
+    console.log(`After removing protocol: ${filePath}`)
     sendLogToRenderer(`After removing protocol: ${filePath}`)
     
     // On Windows, the path might start with a slash before the drive letter
@@ -1128,8 +1153,10 @@ app.whenReady().then(async () => {
 
     try {
       // Verify file exists before returning
+      console.log(`Checking if file exists: ${filePath}`)
       sendLogToRenderer(`Checking if file exists: ${filePath}`)
       if (fs.existsSync(filePath)) {
+        console.log(`File exists! Returning path: ${filePath}`)
         sendLogToRenderer(`File exists! Returning path: ${filePath}`)
         // Get file stats for caching headers
         const stats = fs.statSync(filePath)
@@ -1170,18 +1197,24 @@ app.whenReady().then(async () => {
         }
       } else {
         console.error('Asset file not found:', filePath)
+        sendLogToRenderer(`Asset file not found: ${filePath}`)
         // Try with original path format as fallback
         const originalPath = decodeURIComponent(request.url.replace('local-image://', ''))
         console.log('Trying original path:', originalPath)
+        sendLogToRenderer(`Trying original path: ${originalPath}`)
         if (fs.existsSync(originalPath)) {
           console.log('Original path exists!')
+          sendLogToRenderer('Original path exists!')
           callback({ path: originalPath })
         } else {
+          console.error('Original path also not found, returning error')
+          sendLogToRenderer('Original path also not found, returning error')
           callback({ error: -6 }) // FILE_NOT_FOUND
         }
       }
     } catch (error) {
       console.error('Error loading asset:', filePath, error)
+      sendLogToRenderer(`Error loading asset: ${filePath} - ${error.message}`)
       callback({ error: -2 }) // FAILED
     }
   })

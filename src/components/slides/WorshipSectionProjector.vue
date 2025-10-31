@@ -30,8 +30,8 @@
               fontSize: `${baseFontSize}cqw`,
               fontFamily: slide.fontFamily || 'Inter, sans-serif',
               fontWeight: slide.fontWeight || 600,
-              color: '#ffffff',
-              textShadow: slide.textShadow || '2px 2px 8px rgba(0, 0, 0, 0.9), 0 0 25px rgba(0, 0, 0, 0.7)',
+              color: textColor,
+              textShadow: textShadow,
               letterSpacing: '0.02em',
               lineHeight: 1.2
             }"
@@ -85,6 +85,24 @@ const baseFontSize = computed(() => {
   // Default is 2.5, scaled by textScale
   const multiplier = props.textScale / 100
   return (2.5 * multiplier).toFixed(2)
+})
+
+// Text color based on fontColor setting
+const textColor = computed(() => {
+  const colorMode = props.slide?.fontColor || 'light'
+  return colorMode === 'dark' ? '#000000' : '#ffffff'
+})
+
+// Text shadow based on fontColor setting
+const textShadow = computed(() => {
+  const colorMode = props.slide?.fontColor || 'light'
+  if (colorMode === 'dark') {
+    // Dark text needs light shadow
+    return '2px 2px 8px rgba(255, 255, 255, 0.9), 0 0 25px rgba(255, 255, 255, 0.7)'
+  } else {
+    // Light text needs dark shadow
+    return '2px 2px 8px rgba(0, 0, 0, 0.9), 0 0 25px rgba(0, 0, 0, 0.7)'
+  }
 })
 </script>
 

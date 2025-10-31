@@ -808,13 +808,64 @@
                 </div>
             </div>
 
-            <!-- Worship Mode: Section Grid + Live Preview -->
-            <WorshipControl
-                v-if="isWorshipModeActive"
-                :text-scale="textScale"
-                :library-root="libraryRoot"
-                @clear="handleWorshipClear"
-            />
+            <!-- Worship Mode: Controls + Section Grid -->
+            <div v-if="isWorshipModeActive" class="flex-1 flex flex-col min-w-0">
+                <!-- Worship Controls (matching normal mode layout) -->
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <button
+                            @click="worshipPrevSection"
+                            :disabled="!canGoPrevSection"
+                            class="px-3 py-1.5 text-xs font-medium rounded-lg transition-all disabled:opacity-30"
+                            :class="
+                                canGoPrevSection
+                                    ? 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700 hover:text-white'
+                                    : 'bg-neutral-900 text-neutral-600 cursor-not-allowed'
+                            "
+                        >
+                            ← Prev
+                        </button>
+
+                        <button
+                            @click="handleWorshipGoLive"
+                            :disabled="!stagedSection"
+                            class="px-6 py-1.5 text-sm font-bold bg-gold-500 text-black rounded-lg hover:bg-gold-400 transition-all shadow-lg shadow-gold-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            GO LIVE
+                        </button>
+
+                        <button
+                            @click="worshipNextSection"
+                            :disabled="!canGoNextSection"
+                            class="px-3 py-1.5 text-xs font-medium rounded-lg transition-all disabled:opacity-30"
+                            :class="
+                                canGoNextSection
+                                    ? 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700 hover:text-white'
+                                    : 'bg-neutral-900 text-neutral-600 cursor-not-allowed'
+                            "
+                        >
+                            Next →
+                        </button>
+
+                        <button
+                            @click="handleWorshipClear"
+                            class="ml-4 px-3 py-1.5 text-xs font-medium bg-neutral-800 text-neutral-300 hover:bg-red-900/30 hover:text-red-400 rounded-lg transition-all"
+                        >
+                            Clear
+                        </button>
+                    </div>
+
+                    <div class="text-[10px] text-neutral-600 uppercase tracking-wider">
+                        {{ currentSong?.title || 'Song' }} • Section {{ stagedSectionIndex + 1 }}
+                    </div>
+                </div>
+
+                <!-- Worship Section Grid -->
+                <WorshipControl
+                    :text-scale="textScale"
+                    :library-root="libraryRoot"
+                />
+            </div>
 
             <!-- Normal Mode: Staged Preview + Thumbnails + Live Preview -->
             <!-- Center: Large Staged Preview with Aspect Ratio -->
@@ -1668,18 +1719,31 @@ function handleAddWorshipStack(worshipData) {
     showWorshipDialog.value = false;
 }
 
+function handleWorshipGoLive() {
+    // Call presentation goLive to unstage previous stack and stop auto-advance
+    goLive();
+    // Then call worship goLive to send the section to projector
+    worshipGoLive();
+}
+
 function handleWorshipClear() {
-    // Clear worship section
+    // Two-stage clear: 1st call = clear lyrics, 2nd call = black screen
     worshipClearProjection();
-    // Also clear the underlying slide to stop auto-advance and fully reset
-    clearProjection();
 }
 
 function handleSaveSongEdit(updatedSettings) {
     if (editingStackIndex.value !== null && editingSlideIndex.value !== null) {
-        // Update the song slide with new settings
+        // Update the song slide with new settings (property by property for Vue reactivity)
         const slide = stacks.value[editingStackIndex.value].slides[editingSlideIndex.value];
-        Object.assign(slide, updatedSettings);
+
+        // Update each property individually to maintain Vue reactivity
+        slide.backgroundMode = updatedSettings.backgroundMode;
+        slide.backgroundVideo = updatedSettings.backgroundVideo;
+        slide.backgroundOpacity = updatedSettings.backgroundOpacity;
+        slide.fontFamily = updatedSettings.fontFamily;
+        slide.fontWeight = updatedSettings.fontWeight;
+        slide.fontColor = updatedSettings.fontColor;
+        slide.linesPerSection = updatedSettings.linesPerSection;
 
         // Clear editing state
         editingSlide.value = null;
@@ -2310,10 +2374,11 @@ async function loadPresentation() {
 
 useKeyboard({
     onSpace: () => {
+        // Always call presentation goLive to unstage previous stack and stop auto-advance
+        goLive();
+        // If in worship mode, also send the worship section to projector
         if (isWorshipModeActive.value) {
             worshipGoLive();
-        } else {
-            goLive();
         }
     },
     onArrowLeft: () => {
@@ -2350,9 +2415,8 @@ useKeyboard({
     },
     onEscape: () => {
         if (isWorshipModeActive.value) {
+            // Two-stage clear: 1st ESC = clear lyrics, 2nd ESC = black screen
             worshipClearProjection();
-            // Also clear the underlying slide to stop any auto-advance
-            clearProjection();
         } else {
             clearProjection();
         }
@@ -2479,11 +2543,11 @@ watch(
     },
 );
 
-// Handle song slides - enter/exit worship mode as needed
+// Handle song slides - enter worship mode when STAGED (for preview)
 watch(
     () => currentSlide.value,
     (newSlide) => {
-        // If it's a song slide, load it into worship mode
+        // If it's a song slide, load it into worship mode for preview
         if (newSlide?.type === 'song') {
             const song = findSongById(newSlide.songId);
             if (song) {
@@ -2509,8 +2573,8 @@ watch(
 
 // Send live worship section to projector
 watch(
-    () => [liveSection.value, liveSectionIndex.value, currentSong.value, isWorshipModeActive.value],
-    ([section, sectionIndex, song, worshipActive]) => {
+    () => [liveSection.value, liveSectionIndex.value, currentSong.value, isWorshipModeActive.value, lyricsCleared.value],
+    ([section, sectionIndex, song, worshipActive, clearedState], [prevSection, prevSectionIndex]) => {
         // Only handle projection when in worship mode AND on a song slide
         if (!worshipActive || currentSlide.value?.type !== 'song') {
             return;
@@ -2540,6 +2604,10 @@ watch(
                 songKey: song.current_key || song.key,
                 backgroundMode: currentSlide.value?.backgroundMode || 'none',
                 backgroundVideo: currentBackgroundVideo.value || currentSlide.value?.backgroundVideo || null,
+                backgroundOpacity: currentSlide.value?.backgroundOpacity || 0.4,
+                fontFamily: currentSlide.value?.fontFamily || 'Inter, sans-serif',
+                fontWeight: currentSlide.value?.fontWeight || 600,
+                fontColor: currentSlide.value?.fontColor || 'light',
                 lyricsCleared: lyricsCleared.value
             };
 
@@ -2553,18 +2621,13 @@ watch(
                 };
                 window.electronAPI.updateProjector(JSON.stringify(dataToSend));
             }
-        } else if (liveSectionIndex.value === null) {
-            // Clear projection when no section is live (but still in worship mode)
-            if (window.electronAPI?.updateProjector) {
-                const dataToSend = {
-                    slide: null,
-                    transition: 'fade',
-                    libraryRoot: libraryRoot.value,
-                    textScale: textScale.value
-                };
-                window.electronAPI.updateProjector(JSON.stringify(dataToSend));
-            }
+        } else if (sectionIndex === null && prevSectionIndex !== null) {
+            // Second ESC press: transitioned from having a live section to null
+            // Call the presentation's clearProjection to properly clear everything
+            clearProjection();
         }
+        // Note: If liveSectionIndex is null from the start (just staging),
+        // prevSectionIndex will also be null/undefined, so we won't clear
     },
     { deep: true }
 );

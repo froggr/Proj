@@ -9,6 +9,7 @@
       :controls="showNativeControls"
       :autoplay="autoplay"
       :muted="muted"
+      :loop="loop"
       playsinline
       preload="auto"
       @loadeddata="onLoadedData"
@@ -46,6 +47,10 @@ const props = defineProps({
   muted: {
     type: Boolean,
     default: true
+  },
+  loop: {
+    type: Boolean,
+    default: false
   },
   showNativeControls: {
     type: Boolean,

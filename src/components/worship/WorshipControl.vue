@@ -2,66 +2,7 @@
   <!-- Just the middle section grid - left panel (songs) is handled by ControlView -->
   <!-- Section Grid (replaces slide thumbnails in normal mode) -->
   <div class="flex-1 bg-neutral-900/50 backdrop-blur rounded-xl border border-neutral-800 flex flex-col overflow-hidden">
-      <!-- Header with song info -->
-      <div class="p-4 border-b border-neutral-800/50 flex items-center justify-between flex-shrink-0">
-        <div class="flex items-center gap-4">
-          <div>
-            <h2 class="text-lg font-semibold text-white">
-              {{ currentSong?.title || 'No Song Selected' }}
-            </h2>
-            <div v-if="currentSong" class="flex items-center gap-3 text-xs text-neutral-400 mt-1">
-              <span v-if="currentSong.artist">{{ currentSong.artist }}</span>
-              <span v-if="currentSong.key" class="text-neutral-500">•</span>
-              <span v-if="currentSong.key">{{ currentSong.key }}</span>
-              <span v-if="currentSong.tempo" class="text-neutral-500">•</span>
-              <span v-if="currentSong.tempo">{{ currentSong.tempo }} BPM</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Section navigation controls -->
-        <div class="flex items-center gap-2">
-          <button
-            @click="prevSection"
-            :disabled="!canGoPrevSection"
-            class="p-2 bg-neutral-800 hover:bg-neutral-700 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            title="Previous Section (←)"
-          >
-            <svg class="w-4 h-4 text-neutral-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <button
-            @click="goLive"
-            :disabled="!stagedSection"
-            class="px-4 py-2 bg-gold-500 hover:bg-gold-600 text-black text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Go Live (Space)"
-          >
-            GO LIVE
-          </button>
-          <button
-            @click="nextSection"
-            :disabled="!canGoNextSection"
-            class="p-2 bg-neutral-800 hover:bg-neutral-700 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            title="Next Section (→)"
-          >
-            <svg class="w-4 h-4 text-neutral-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-          <button
-            @click="$emit('clear')"
-            class="p-2 bg-neutral-800 hover:bg-neutral-700 rounded-lg transition-colors"
-            title="Clear (Esc)"
-          >
-            <svg class="w-4 h-4 text-neutral-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <!-- Section Grid (like DongleControl) -->
+      <!-- Section Grid (buttons now in ControlView for consistent positioning) -->
       <div class="flex-1 overflow-y-auto p-4">
         <div v-if="currentSong?.processed_sections" class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           <div
@@ -117,10 +58,12 @@
 import { watch } from 'vue'
 import { useWorship } from '@/composables/useWorship'
 
-defineEmits(['clear'])
+defineEmits(['clear', 'go-live'])
 
 const {
   currentSong,
+  stagedSection,
+  liveSection,
   stagedSectionIndex,
   liveSectionIndex,
   canGoPrevSection,

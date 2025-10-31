@@ -56,6 +56,9 @@ export function loadWorshipStack(stackData) {
   liveSectionIndex.value = null
   lyricsCleared.value = false
 
+  // Note: We don't clear the projector here because the watcher in ControlView
+  // will handle projection when the user goes live with a section
+
   // Load background video based on mode
   if (stackData.backgroundMode === 'single') {
     // Single video mode - use the backgroundVideo directly
@@ -204,6 +207,8 @@ export function prevSection() {
 
 /**
  * Send staged section live to projector
+ * Note: This should be called alongside the presentation's goLive() in ControlView
+ * to properly unstage the previous stack and stop auto-advance timers
  */
 export function goLive() {
   liveSectionIndex.value = stagedSectionIndex.value
