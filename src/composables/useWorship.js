@@ -32,21 +32,51 @@ const nextBackgroundVideo = ref(null) // Next video URL for crossfade
 
 /**
  * Load a worship stack (called when clicking a worship song slide)
- * @param {Object} stackData - { currentSong, setlist, backgroundMode, backgroundVideos }
+ * @param {Object} stackData - { currentSong, setlist, backgroundMode, backgroundVideos, linesPerSection }
  */
 export function loadWorshipStack(stackData) {
   // Add intro/outro sections if they don't exist (for songs imported before this feature)
   if (stackData.currentSong?.processed_sections) {
     const sections = stackData.currentSong.processed_sections
+    const linesPerSection = stackData.linesPerSection || 4
+
+    // Split long sections into multiple parts
+    const splitSections = []
+
+    sections.forEach(section => {
+      if (section.lines && section.lines.length > linesPerSection) {
+        // Section is too long - split it into multiple parts
+        const numParts = Math.ceil(section.lines.length / linesPerSection)
+        for (let i = 0; i < numParts; i++) {
+          const startLine = i * linesPerSection
+          const endLine = Math.min(startLine + linesPerSection, section.lines.length)
+          const partTitle = numParts > 1 ? `${section.title} (${i + 1}/${numParts})` : section.title
+
+          splitSections.push({
+            title: partTitle,
+            lines: section.lines.slice(startLine, endLine),
+            originalSection: section.title,
+            part: i + 1,
+            totalParts: numParts
+          })
+        }
+      } else {
+        // Section fits - keep as is
+        splitSections.push(section)
+      }
+    })
+
+    // Replace sections with split sections
+    stackData.currentSong.processed_sections = splitSections
 
     // Check if Intro exists (first section)
-    if (!sections[0] || sections[0].title !== 'Intro') {
-      sections.unshift({ title: 'Intro', lines: [] })
+    if (!splitSections[0] || splitSections[0].title !== 'Intro') {
+      splitSections.unshift({ title: 'Intro', lines: [] })
     }
 
     // Check if Outro exists (last section)
-    if (!sections[sections.length - 1] || sections[sections.length - 1].title !== 'Outro') {
-      sections.push({ title: 'Outro', lines: [] })
+    if (!splitSections[splitSections.length - 1] || splitSections[splitSections.length - 1].title !== 'Outro') {
+      splitSections.push({ title: 'Outro', lines: [] })
     }
   }
 

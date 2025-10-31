@@ -1769,6 +1769,7 @@ function handleSlideClick(stackIndex, slideIndex, slide) {
                 setlist: [song], // For now, single-song stacks
                 backgroundMode: slide.backgroundMode,
                 backgroundVideos: slide.backgroundVideos || [],
+                linesPerSection: slide.linesPerSection || 4
             });
         }
     }
@@ -2557,7 +2558,8 @@ watch(
                     currentSong: song,
                     setlist: [newSlide.songId],
                     backgroundMode: newSlide.backgroundMode || 'none',
-                    backgroundVideos: newSlide.backgroundVideo ? [newSlide.backgroundVideo] : []
+                    backgroundVideos: newSlide.backgroundVideo ? [newSlide.backgroundVideo] : [],
+                    linesPerSection: newSlide.linesPerSection || 4
                 });
             }
         }
@@ -2583,24 +2585,13 @@ watch(
         }
 
         if (section && song) {
-            // Check if section needs splitting based on linesPerSection
-            const linesPerSection = currentSlide.value?.linesPerSection || 4;
-            let displaySection = section;
-
-            // If section has more lines than allowed, split it
-            // Note: For now we just show the first N lines.
-            // TODO: In future, implement pagination through split sections
-            if (section.lines && section.lines.length > linesPerSection) {
-                displaySection = {
-                    ...section,
-                    lines: section.lines.slice(0, linesPerSection)
-                };
-            }
+            // Sections are already split by loadWorshipStack based on linesPerSection
+            // No need to truncate here - just display the section as-is
 
             // Create a slide object for the section to send to projector
             const sectionSlide = {
                 type: 'worship-section',
-                sectionData: displaySection,
+                sectionData: section,
                 songTitle: song.title,
                 songArtist: song.artist,
                 songKey: song.current_key || song.key,
