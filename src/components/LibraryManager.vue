@@ -8,15 +8,15 @@
           <!-- Tabs -->
           <div class="flex items-center gap-2">
             <button
-              @click="activeTab = 'backgrounds'"
+              @click="activeTab = 'media'"
               :class="[
                 'px-4 py-1.5 rounded text-sm font-medium transition-colors',
-                activeTab === 'backgrounds'
+                activeTab === 'media'
                   ? 'bg-gold-500 text-black'
                   : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
               ]"
             >
-              Backgrounds
+              Media
             </button>
             <button
               @click="activeTab = 'songs'"
@@ -41,8 +41,8 @@
         </button>
       </div>
 
-      <!-- Backgrounds Tab Content -->
-      <div v-if="activeTab === 'backgrounds'" class="flex flex-col flex-1 min-h-0">
+      <!-- Media Tab Content -->
+      <div v-if="activeTab === 'media'" class="flex flex-col flex-1 min-h-0">
         <!-- Filter -->
       <div class="px-6 py-3 border-b border-neutral-800 flex-shrink-0">
         <div class="flex items-center gap-2">
@@ -79,6 +79,29 @@
             ]"
           >
             Videos
+          </button>
+          <div class="w-px h-6 bg-neutral-700 mx-1"></div>
+          <button
+            @click="filterType = 'background-images'"
+            :class="[
+              'px-3 py-1 rounded text-sm transition-colors',
+              filterType === 'background-images'
+                ? 'bg-gold-500 text-black'
+                : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
+            ]"
+          >
+            Background Images
+          </button>
+          <button
+            @click="filterType = 'background-videos'"
+            :class="[
+              'px-3 py-1 rounded text-sm transition-colors',
+              filterType === 'background-videos'
+                ? 'bg-gold-500 text-black'
+                : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
+            ]"
+          >
+            Background Videos
           </button>
         </div>
       </div>
@@ -171,7 +194,7 @@
         </button>
       </div>
       </div>
-      <!-- End Backgrounds Tab -->
+      <!-- End Media Tab -->
 
       <!-- Songs Tab Content -->
       <div v-else-if="activeTab === 'songs'" class="flex flex-col flex-1 min-h-0">
@@ -456,9 +479,9 @@ const props = defineProps({
 const emit = defineEmits(['close', 'asset-deleted', 'song-updated'])
 
 // Tab state
-const activeTab = ref('backgrounds')
+const activeTab = ref('media')
 
-// Backgrounds tab state
+// Media tab state
 const assets = ref([])
 const loading = ref(false)
 const filterType = ref('all')
@@ -483,19 +506,40 @@ const songUsage = ref([])
 
 const filteredAssets = computed(() => {
   if (filterType.value === 'all') return assets.value
+
   if (filterType.value === 'images') {
-    return assets.value.filter(a => a.type === 'image')
+    // Show only images that are NOT backgrounds
+    return assets.value.filter(a =>
+      a.type === 'image' && (!a.path || !a.path.includes('/backgrounds/'))
+    )
   }
+
   if (filterType.value === 'videos') {
-    return assets.value.filter(a => a.type === 'video')
+    // Show only videos that are NOT backgrounds
+    return assets.value.filter(a =>
+      a.type === 'video' && (!a.path || !a.path.includes('/backgrounds/'))
+    )
   }
+
+  if (filterType.value === 'background-images') {
+    return assets.value.filter(a =>
+      a.type === 'image' && a.path && a.path.includes('/backgrounds/')
+    )
+  }
+
+  if (filterType.value === 'background-videos') {
+    return assets.value.filter(a =>
+      a.type === 'video' && a.path && a.path.includes('/backgrounds/')
+    )
+  }
+
   return assets.value
 })
 
 // Load content when library root changes, dialog opens, or tab changes
 watch([() => props.show, () => props.libraryRoot, activeTab], async ([isShowing, libRoot, tab]) => {
   if (isShowing && libRoot) {
-    if (tab === 'backgrounds') {
+    if (tab === 'media') {
       await loadAssets()
     } else if (tab === 'songs') {
       await loadSongs()
