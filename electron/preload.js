@@ -70,6 +70,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   settingsSet: (key, value) => ipcRenderer.invoke('settings-set', key, value),
   settingsDelete: (key) => ipcRenderer.invoke('settings-delete', key),
 
+  // System fonts
+  getSystemFonts: () => ipcRenderer.invoke('get-system-fonts'),
+
   // Library management
   createLibrary: (parentPath, libraryName) => ipcRenderer.invoke('create-library', parentPath, libraryName),
   loadLibraryMetadata: (libPath) => ipcRenderer.invoke('load-library-metadata', libPath),

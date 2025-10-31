@@ -90,23 +90,11 @@
         </div>
 
         <!-- Font Family -->
-        <div>
-          <label class="block text-sm font-medium text-neutral-300 mb-2">Font</label>
-          <select
-            v-model="fontFamily"
-            class="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-200 text-sm"
-            :style="{ fontFamily: fontFamily }"
-          >
-            <option
-              v-for="font in availableFonts"
-              :key="font.value"
-              :value="font.value"
-              :style="{ fontFamily: font.value }"
-            >
-              {{ font.label }}
-            </option>
-          </select>
-        </div>
+        <FontPicker
+          v-model="fontFamily"
+          label="Font"
+          @preview="handleFontPreview"
+        />
 
         <!-- Font Weight -->
         <div>
@@ -183,7 +171,7 @@
               <div
                 class="text-center"
                 :style="{
-                  fontFamily: fontFamily,
+                  fontFamily: previewFont || fontFamily,
                   fontWeight: fontWeight,
                   color: fontColor === 'dark' ? '#000000' : '#ffffff',
                   textShadow: textShadow
@@ -226,8 +214,9 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch } from 'vue'
 import Modal from './Modal.vue'
+import FontPicker from './FontPicker.vue'
 import { useSongLibrary } from '@/library/SongLibrary'
 import { resolveAssetUrl } from '@/utils/assetResolver'
 
@@ -256,7 +245,7 @@ const fontWeight = ref(600)
 const fontColor = ref('light')
 const textShadow = ref(true)
 const linesPerSection = ref(4)
-const availableFonts = ref([])
+const previewFont = ref(null) // Temporary font for keyboard preview
 
 // Resolve video URL for preview (use ref + watch instead of async computed)
 const resolvedVideoUrl = ref(null)
@@ -269,104 +258,10 @@ watch(() => [backgroundVideo.value, props.libraryRoot], async ([videoUrl, libRoo
   resolvedVideoUrl.value = await resolveAssetUrl(videoUrl, libRoot)
 }, { immediate: true })
 
-// Comprehensive list of common fonts to check
-const fontsToCheck = [
-  // System defaults
-  { name: 'System Default', value: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', category: 'system' },
-
-  // macOS system fonts
-  { name: 'San Francisco', value: '-apple-system, BlinkMacSystemFont, sans-serif', category: 'sans' },
-  { name: 'Helvetica Neue', value: '"Helvetica Neue", Helvetica, sans-serif', category: 'sans' },
-  { name: 'Helvetica', value: 'Helvetica, sans-serif', category: 'sans' },
-  { name: 'Arial', value: 'Arial, sans-serif', category: 'sans' },
-  { name: 'Avenir', value: 'Avenir, sans-serif', category: 'sans' },
-  { name: 'Avenir Next', value: '"Avenir Next", Avenir, sans-serif', category: 'sans' },
-  { name: 'Futura', value: 'Futura, sans-serif', category: 'sans' },
-  { name: 'Gill Sans', value: '"Gill Sans", sans-serif', category: 'sans' },
-  { name: 'Optima', value: 'Optima, sans-serif', category: 'sans' },
-  { name: 'Trebuchet MS', value: '"Trebuchet MS", sans-serif', category: 'sans' },
-  { name: 'Verdana', value: 'Verdana, sans-serif', category: 'sans' },
-  { name: 'Tahoma', value: 'Tahoma, sans-serif', category: 'sans' },
-
-  // Serif fonts
-  { name: 'Times New Roman', value: '"Times New Roman", Times, serif', category: 'serif' },
-  { name: 'Times', value: 'Times, serif', category: 'serif' },
-  { name: 'Georgia', value: 'Georgia, serif', category: 'serif' },
-  { name: 'Palatino', value: 'Palatino, "Palatino Linotype", serif', category: 'serif' },
-  { name: 'Baskerville', value: 'Baskerville, serif', category: 'serif' },
-  { name: 'Didot', value: 'Didot, serif', category: 'serif' },
-  { name: 'Garamond', value: 'Garamond, serif', category: 'serif' },
-  { name: 'Hoefler Text', value: '"Hoefler Text", serif', category: 'serif' },
-  { name: 'Cochin', value: 'Cochin, serif', category: 'serif' },
-  { name: 'Big Caslon', value: '"Big Caslon", serif', category: 'serif' },
-
-  // Display/Decorative
-  { name: 'Impact', value: 'Impact, "Arial Black", sans-serif', category: 'display' },
-  { name: 'Copperplate', value: 'Copperplate, sans-serif', category: 'display' },
-  { name: 'American Typewriter', value: '"American Typewriter", serif', category: 'display' },
-  { name: 'Papyrus', value: 'Papyrus, cursive', category: 'display' },
-  { name: 'Brush Script MT', value: '"Brush Script MT", cursive', category: 'display' },
-  { name: 'Chalkboard', value: 'Chalkboard, cursive', category: 'display' },
-  { name: 'Comic Sans MS', value: '"Comic Sans MS", cursive', category: 'display' },
-  { name: 'Marker Felt', value: '"Marker Felt", cursive', category: 'display' },
-  { name: 'SignPainter', value: 'SignPainter, cursive', category: 'display' },
-  { name: 'Snell Roundhand', value: '"Snell Roundhand", cursive', category: 'display' },
-  { name: 'Trattatello', value: 'Trattatello, cursive', category: 'display' },
-  { name: 'Zapfino', value: 'Zapfino, cursive', category: 'display' },
-
-  // Monospace
-  { name: 'Courier New', value: '"Courier New", Courier, monospace', category: 'mono' },
-  { name: 'Courier', value: 'Courier, monospace', category: 'mono' },
-  { name: 'Monaco', value: 'Monaco, monospace', category: 'mono' },
-  { name: 'Menlo', value: 'Menlo, monospace', category: 'mono' },
-  { name: 'Consolas', value: 'Consolas, monospace', category: 'mono' },
-  { name: 'Andale Mono', value: '"Andale Mono", monospace', category: 'mono' },
-
-  // Windows fonts (if on PC)
-  { name: 'Segoe UI', value: '"Segoe UI", sans-serif', category: 'sans' },
-  { name: 'Calibri', value: 'Calibri, sans-serif', category: 'sans' },
-  { name: 'Cambria', value: 'Cambria, serif', category: 'serif' },
-  { name: 'Candara', value: 'Candara, sans-serif', category: 'sans' },
-  { name: 'Constantia', value: 'Constantia, serif', category: 'serif' },
-  { name: 'Corbel', value: 'Corbel, sans-serif', category: 'sans' },
-]
-
-// Check if a font is available using canvas measurement
-function isFontAvailable(fontName) {
-  const testString = 'mmmmmmmmmmlli'
-  const testSize = '72px'
-  const canvas = document.createElement('canvas')
-  const context = canvas.getContext('2d')
-
-  // Measure with fallback
-  context.font = `${testSize} monospace`
-  const baselineWidth = context.measureText(testString).width
-
-  // Measure with test font
-  context.font = `${testSize} ${fontName}, monospace`
-  const testWidth = context.measureText(testString).width
-
-  return Math.abs(testWidth - baselineWidth) > 1
+// Handle font preview (when user navigates with keyboard)
+function handleFontPreview(font) {
+  previewFont.value = font
 }
-
-// Detect available fonts on mount
-onMounted(() => {
-  availableFonts.value = fontsToCheck
-    .filter(font => {
-      // Always include system default
-      if (font.category === 'system') return true
-
-      // Extract first font name to test
-      const firstFont = font.value.split(',')[0].replace(/['"]/g, '').trim()
-      return isFontAvailable(firstFont)
-    })
-    .map(font => ({
-      label: font.name,
-      value: font.value,
-      category: font.category
-    }))
-  console.log('SongPicker: Available fonts:', availableFonts.value.length)
-})
 
 async function handleImportSongs() {
   try {

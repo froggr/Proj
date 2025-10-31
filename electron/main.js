@@ -408,6 +408,81 @@ ipcMain.handle('settings-delete', (event, key) => {
   return true
 })
 
+// Get system fonts
+ipcMain.handle('get-system-fonts', async () => {
+  const { execSync } = require('child_process')
+  const os = require('os')
+  const platform = os.platform()
+
+  try {
+    let fonts = new Set()
+
+    if (platform === 'darwin') {
+      // macOS: Read font directories
+      const fontDirs = [
+        '/System/Library/Fonts',
+        '/Library/Fonts',
+        path.join(os.homedir(), 'Library/Fonts')
+      ]
+
+      fontDirs.forEach(dir => {
+        try {
+          if (fs.existsSync(dir)) {
+            const files = fs.readdirSync(dir)
+            files.forEach(file => {
+              // Extract font name from filename (remove extension and variants)
+              const fontName = file
+                .replace(/\.(ttf|otf|ttc|dfont)$/i, '')
+                .replace(/-(Regular|Bold|Italic|Light|Medium|Heavy|Black|Thin|UltraLight).*$/i, '')
+                .trim()
+              if (fontName) fonts.add(fontName)
+            })
+          }
+        } catch (err) {
+          console.warn(`Could not read font directory ${dir}:`, err.message)
+        }
+      })
+    } else if (platform === 'win32') {
+      // Windows: Read Windows/Fonts directory
+      const fontsDir = path.join(process.env.WINDIR || 'C:\\Windows', 'Fonts')
+      try {
+        if (fs.existsSync(fontsDir)) {
+          const files = fs.readdirSync(fontsDir)
+          files.forEach(file => {
+            const fontName = file
+              .replace(/\.(ttf|otf|ttc)$/i, '')
+              .replace(/-(Regular|Bold|Italic|Light|Medium|Heavy|Black|Thin).*$/i, '')
+              .trim()
+            if (fontName) fonts.add(fontName)
+          })
+        }
+      } catch (err) {
+        console.warn('Could not read Windows fonts directory:', err.message)
+      }
+    } else {
+      // Linux: Use fc-list command
+      try {
+        const output = execSync('fc-list : family', { encoding: 'utf-8' })
+        const lines = output.split('\n')
+        lines.forEach(line => {
+          const fontName = line.split(',')[0].trim()
+          if (fontName) fonts.add(fontName)
+        })
+      } catch (err) {
+        console.warn('Could not enumerate Linux fonts:', err.message)
+      }
+    }
+
+    // Convert Set to sorted array
+    const fontList = Array.from(fonts).sort((a, b) => a.localeCompare(b))
+    console.log(`Found ${fontList.length} system fonts`)
+    return fontList
+  } catch (error) {
+    console.error('Error getting system fonts:', error)
+    return []
+  }
+})
+
 // File dialog handlers
 ipcMain.handle('save-presentation', async (event, data) => {
   try {
