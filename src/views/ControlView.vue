@@ -1177,6 +1177,7 @@
     <SongPicker
         :show="showSongDialog"
         :songs="librarySongs"
+        :library-root="libraryRoot"
         @close="showSongDialog = false"
         @add="handleAddSongSlide"
         @import-songs="loadSongs"
@@ -1185,6 +1186,7 @@
     <SongSlideEditor
         :show="showSongEditor"
         :slide="editingSlide"
+        :library-root="libraryRoot"
         @close="showSongEditor = false"
         @save="handleSaveSongEdit"
         @select-video="handleSelectBackgroundVideo"
@@ -2605,9 +2607,10 @@ watch(
                 backgroundMode: currentSlide.value?.backgroundMode || 'none',
                 backgroundVideo: currentBackgroundVideo.value || currentSlide.value?.backgroundVideo || null,
                 backgroundOpacity: currentSlide.value?.backgroundOpacity || 0.4,
-                fontFamily: currentSlide.value?.fontFamily || 'Inter, sans-serif',
+                fontFamily: currentSlide.value?.fontFamily || 'system-ui, -apple-system, sans-serif',
                 fontWeight: currentSlide.value?.fontWeight || 600,
                 fontColor: currentSlide.value?.fontColor || 'light',
+                textShadow: currentSlide.value?.textShadow !== undefined ? currentSlide.value.textShadow : true,
                 lyricsCleared: lyricsCleared.value
             };
 
