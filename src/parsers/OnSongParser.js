@@ -53,6 +53,22 @@ export function parseOnSong(data, filename = 'Untitled') {
       return
     }
 
+    // Square bracket section headers: [Verse 1], [Chorus], [Bridge], etc.
+    if (trimmed.match(/^\[([^\]]+)\]$/)) {
+      // Save previous section
+      if (currentSection && currentSection.lines.length > 0) {
+        sections.push(currentSection)
+      }
+
+      // Create new section
+      const sectionName = trimmed.slice(1, -1).trim() // Remove the brackets
+      currentSection = {
+        title: sectionName,
+        lines: []
+      }
+      return
+    }
+
     // OnSong section headers: plain text ending with colon (e.g., "Verse 1:", "Chorus:", "Bridge:")
     // Check if line is a section header (ends with : and has no chord markers)
     if (trimmed.endsWith(':') && !trimmed.includes('[')) {

@@ -1323,6 +1323,96 @@ ipcMain.handle('save-songs', async (event, libPath, songs) => {
   }
 })
 
+// Save or update a single song
+ipcMain.handle('save-song', async (event, libPath, songData) => {
+  try {
+    const songsPath = path.join(libPath, 'songs.json')
+
+    // Load existing songs
+    let songs = []
+    if (fs.existsSync(songsPath)) {
+      const data = fs.readFileSync(songsPath, 'utf-8')
+      songs = JSON.parse(data)
+    }
+
+    // If song has ID, update existing; otherwise create new
+    if (songData.id) {
+      const index = songs.findIndex(s => s.id === songData.id)
+      if (index !== -1) {
+        songs[index] = songData
+      } else {
+        songs.push(songData)
+      }
+    } else {
+      // Generate new ID
+      songData.id = Date.now().toString() + '-' + Math.random().toString(36).substring(7)
+      songs.push(songData)
+    }
+
+    // Save back to file
+    fs.writeFileSync(songsPath, JSON.stringify(songs, null, 2), 'utf-8')
+    return { success: true, song: songData }
+  } catch (error) {
+    console.error('Save song failed:', error)
+    return { success: false, error: error.message }
+  }
+})
+
+// Delete a song
+ipcMain.handle('delete-song', async (event, libPath, songId) => {
+  try {
+    const songsPath = path.join(libPath, 'songs.json')
+
+    // Load existing songs
+    if (!fs.existsSync(songsPath)) {
+      return { success: false, error: 'Songs file not found' }
+    }
+
+    const data = fs.readFileSync(songsPath, 'utf-8')
+    let songs = JSON.parse(data)
+
+    // Filter out the song
+    songs = songs.filter(s => s.id !== songId)
+
+    // Save back to file
+    fs.writeFileSync(songsPath, JSON.stringify(songs, null, 2), 'utf-8')
+    return { success: true }
+  } catch (error) {
+    console.error('Delete song failed:', error)
+    return { success: false, error: error.message }
+  }
+})
+
+// Check song usage in events
+ipcMain.handle('check-song-usage', async (event, libPath, songId) => {
+  try {
+    const eventsDir = path.join(libPath, 'events')
+    const usedInEvents = []
+
+    if (!fs.existsSync(eventsDir)) {
+      return usedInEvents
+    }
+
+    // Read all event files
+    const eventFiles = fs.readdirSync(eventsDir).filter(f => f.endsWith('.json'))
+
+    for (const eventFile of eventFiles) {
+      const eventPath = path.join(eventsDir, eventFile)
+      const eventData = JSON.parse(fs.readFileSync(eventPath, 'utf-8'))
+
+      // Check if any slide references this song
+      if (eventData.slides && eventData.slides.some(slide => slide.songId === songId)) {
+        usedInEvents.push(eventData.title || eventFile.replace('.json', ''))
+      }
+    }
+
+    return usedInEvents
+  } catch (error) {
+    console.error('Check song usage failed:', error)
+    return []
+  }
+})
+
 ipcMain.handle('browse-for-song-files', async () => {
   try {
     const { filePaths, canceled } = await dialog.showOpenDialog(mainWindow, {

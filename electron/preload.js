@@ -107,6 +107,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Song Library Management
   loadSongs: (libPath) => ipcRenderer.invoke('load-songs', libPath),
   saveSongs: (libPath, songs) => ipcRenderer.invoke('save-songs', libPath, songs),
+  saveSong: (libPath, songData) => ipcRenderer.invoke('save-song', libPath, songData),
+  deleteSong: (libPath, songId) => ipcRenderer.invoke('delete-song', libPath, songId),
+  checkSongUsage: (libPath, songId) => ipcRenderer.invoke('check-song-usage', libPath, songId),
   browseForSongFiles: () => ipcRenderer.invoke('browse-for-song-files'),
   readSongFile: (filePath) => ipcRenderer.invoke('read-song-file', filePath)
 })

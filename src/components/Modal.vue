@@ -6,7 +6,10 @@
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm"
         @click.self="$emit('close')"
       >
-        <div class="bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+        <div
+          class="bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl w-full max-h-[90vh] flex flex-col"
+          :class="sizeClass"
+        >
           <!-- Header -->
           <div class="flex items-center justify-between px-6 py-4 border-b border-neutral-800 flex-shrink-0">
             <h2 class="text-lg font-semibold text-gold-500">{{ title }}</h2>
@@ -36,12 +39,33 @@
 </template>
 
 <script setup>
-defineProps({
+import { computed } from 'vue'
+
+const props = defineProps({
   show: Boolean,
-  title: String
+  title: String,
+  size: {
+    type: String,
+    default: 'medium' // small, medium, large, full
+  }
 })
 
 defineEmits(['close'])
+
+const sizeClass = computed(() => {
+  switch (props.size) {
+    case 'small':
+      return 'max-w-md'
+    case 'medium':
+      return 'max-w-2xl'
+    case 'large':
+      return 'max-w-6xl'
+    case 'full':
+      return 'max-w-[95vw]'
+    default:
+      return 'max-w-2xl'
+  }
+})
 </script>
 
 <style scoped>

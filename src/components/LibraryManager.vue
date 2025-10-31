@@ -1,9 +1,36 @@
 <template>
   <div v-if="show" class="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm">
     <div class="bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
-      <!-- Header -->
+      <!-- Header with Tabs -->
       <div class="flex items-center justify-between px-6 py-4 border-b border-neutral-800 flex-shrink-0">
-        <h2 class="text-lg font-semibold text-gold-500">Library Manager</h2>
+        <div class="flex items-center gap-6">
+          <h2 class="text-lg font-semibold text-gold-500">Library Manager</h2>
+          <!-- Tabs -->
+          <div class="flex items-center gap-2">
+            <button
+              @click="activeTab = 'backgrounds'"
+              :class="[
+                'px-4 py-1.5 rounded text-sm font-medium transition-colors',
+                activeTab === 'backgrounds'
+                  ? 'bg-gold-500 text-black'
+                  : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
+              ]"
+            >
+              Backgrounds
+            </button>
+            <button
+              @click="activeTab = 'songs'"
+              :class="[
+                'px-4 py-1.5 rounded text-sm font-medium transition-colors',
+                activeTab === 'songs'
+                  ? 'bg-gold-500 text-black'
+                  : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
+              ]"
+            >
+              Songs
+            </button>
+          </div>
+        </div>
         <button
           @click="handleClose"
           class="text-neutral-400 hover:text-white transition-colors"
@@ -14,7 +41,9 @@
         </button>
       </div>
 
-      <!-- Filter -->
+      <!-- Backgrounds Tab Content -->
+      <div v-if="activeTab === 'backgrounds'" class="flex flex-col flex-1 min-h-0">
+        <!-- Filter -->
       <div class="px-6 py-3 border-b border-neutral-800 flex-shrink-0">
         <div class="flex items-center gap-2">
           <label class="text-sm text-neutral-400">Filter:</label>
@@ -141,6 +170,95 @@
           Close
         </button>
       </div>
+      </div>
+      <!-- End Backgrounds Tab -->
+
+      <!-- Songs Tab Content -->
+      <div v-else-if="activeTab === 'songs'" class="flex flex-col flex-1 min-h-0">
+        <!-- Songs Header with Actions -->
+        <div class="px-6 py-3 border-b border-neutral-800 flex-shrink-0">
+          <div class="flex items-center justify-between">
+            <div class="text-sm text-neutral-400">
+              Manage worship songs
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                @click="createNewSong"
+                class="px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white rounded text-sm font-medium transition-colors"
+              >
+                + New Song
+              </button>
+              <button
+                @click="importSongs"
+                class="px-3 py-1.5 bg-gold-500 hover:bg-gold-600 text-black rounded text-sm font-medium transition-colors"
+              >
+                Import Songs
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Songs List -->
+        <div class="flex-1 overflow-y-auto p-6">
+          <div v-if="loadingSongs" class="flex items-center justify-center h-full">
+            <div class="text-neutral-500">Loading songs...</div>
+          </div>
+          <div v-else-if="songs.length === 0" class="flex flex-col items-center justify-center h-full">
+            <svg class="w-16 h-16 text-neutral-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+            </svg>
+            <p class="text-neutral-500 text-lg font-medium">No songs in library</p>
+            <p class="text-neutral-400 text-sm mt-1">Create a new song or import OnSong/ChordPro files</p>
+          </div>
+          <div v-else class="grid grid-cols-2 gap-4">
+            <div
+              v-for="song in songs"
+              :key="song.id"
+              @click="editSong(song)"
+              class="group bg-neutral-800 rounded-lg p-4 border border-neutral-700 hover:border-gold-500 transition-all cursor-pointer"
+            >
+              <div class="flex items-start justify-between mb-2">
+                <div class="flex-1 min-w-0">
+                  <h3 class="text-white font-semibold text-base truncate">{{ song.title }}</h3>
+                  <p class="text-neutral-400 text-sm truncate">{{ song.artist || 'Unknown Artist' }}</p>
+                </div>
+                <button
+                  @click.stop="confirmDeleteSong(song)"
+                  class="w-8 h-8 bg-red-600/90 hover:bg-red-500 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center flex-shrink-0 ml-2"
+                  title="Delete song"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
+
+              <div class="flex items-center gap-3 text-xs text-neutral-500">
+                <span v-if="song.processed_sections">
+                  {{ song.processed_sections.length }} sections
+                </span>
+                <span v-if="songUsageCount(song.id) > 0" class="text-gold-500">
+                  Used in {{ songUsageCount(song.id) }} event(s)
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Songs Footer -->
+        <div class="flex items-center justify-between px-6 py-4 border-t border-neutral-800 flex-shrink-0">
+          <div class="text-sm text-neutral-400">
+            {{ songs.length }} {{ songs.length === 1 ? 'song' : 'songs' }}
+          </div>
+          <button
+            @click="handleClose"
+            class="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+      <!-- End Songs Tab -->
     </div>
 
     <!-- Confirmation Dialog -->
@@ -262,12 +380,67 @@
         </div>
       </div>
     </div>
+
+    <!-- Song Editor Modal -->
+    <SongEditor
+      :show="showSongEditor"
+      :song="editingSong"
+      @close="closeSongEditor"
+      @save="handleSaveSong"
+    />
+
+    <!-- Delete Song Confirmation Dialog -->
+    <div v-if="deleteSongConfirmation" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/80">
+      <div class="bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl w-full max-w-lg p-6">
+        <h3 class="text-lg font-semibold text-white mb-4">Delete Song?</h3>
+
+        <div v-if="checkingSongUsage" class="text-neutral-400 mb-4">
+          Checking if song is in use...
+        </div>
+
+        <div v-else-if="songUsage.length > 0" class="mb-4">
+          <p class="text-yellow-500 font-medium mb-2">⚠️ Warning: This song is in use!</p>
+          <p class="text-neutral-300 mb-3">This song is used in {{ songUsage.length }} event(s):</p>
+          <ul class="list-disc list-inside text-sm text-neutral-400 space-y-1 mb-4">
+            <li v-for="event in songUsage" :key="event">{{ event }}</li>
+          </ul>
+          <p class="text-neutral-400 text-sm">
+            Deleting this song will break these events. Slides using this song will fail to display.
+          </p>
+        </div>
+
+        <div v-else class="mb-4">
+          <p class="text-neutral-300">
+            Are you sure you want to delete <span class="font-medium text-white">{{ deleteSongConfirmation?.title }}</span>?
+          </p>
+          <p class="text-sm text-neutral-500 mt-2">This action cannot be undone.</p>
+        </div>
+
+        <div class="flex gap-3 justify-end">
+          <button
+            @click="cancelDeleteSong"
+            class="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            v-if="!checkingSongUsage"
+            @click="executeDeleteSong"
+            class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors"
+          >
+            {{ songUsage.length > 0 ? 'Delete Anyway' : 'Delete' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
 import { extractVideoThumbnail } from '../utils/videoThumbnail.js'
+import { useSongLibrary } from '@/library/SongLibrary'
+import SongEditor from './SongEditor.vue'
 
 const props = defineProps({
   show: {
@@ -280,8 +453,12 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'asset-deleted'])
+const emit = defineEmits(['close', 'asset-deleted', 'song-updated'])
 
+// Tab state
+const activeTab = ref('backgrounds')
+
+// Backgrounds tab state
 const assets = ref([])
 const loading = ref(false)
 const filterType = ref('all')
@@ -294,6 +471,16 @@ const showVideoPreview = ref(false)
 const previewVideo = ref(null)
 const regeneratingThumbnail = ref(false)
 
+// Songs tab state
+const { browseSongFiles, importSongFiles } = useSongLibrary()
+const songs = ref([])
+const loadingSongs = ref(false)
+const showSongEditor = ref(false)
+const editingSong = ref(null)
+const deleteSongConfirmation = ref(null)
+const checkingSongUsage = ref(false)
+const songUsage = ref([])
+
 const filteredAssets = computed(() => {
   if (filterType.value === 'all') return assets.value
   if (filterType.value === 'images') {
@@ -305,10 +492,14 @@ const filteredAssets = computed(() => {
   return assets.value
 })
 
-// Load assets when library root changes or dialog opens
-watch([() => props.show, () => props.libraryRoot], async ([isShowing, libRoot]) => {
+// Load content when library root changes, dialog opens, or tab changes
+watch([() => props.show, () => props.libraryRoot, activeTab], async ([isShowing, libRoot, tab]) => {
   if (isShowing && libRoot) {
-    await loadAssets()
+    if (tab === 'backgrounds') {
+      await loadAssets()
+    } else if (tab === 'songs') {
+      await loadSongs()
+    }
   }
 })
 
@@ -492,5 +683,136 @@ async function regenerateThumbnail() {
   } finally {
     regeneratingThumbnail.value = false
   }
+}
+
+// ====== SONGS TAB FUNCTIONS ======
+
+async function loadSongs() {
+  if (!props.libraryRoot || !window.electronAPI) {
+    return
+  }
+
+  loadingSongs.value = true
+  try {
+    const result = await window.electronAPI.loadSongs(props.libraryRoot)
+    songs.value = result.success ? (result.data || []) : []
+  } catch (error) {
+    console.error('Failed to load songs:', error)
+    songs.value = []
+  } finally {
+    loadingSongs.value = false
+  }
+}
+
+async function createNewSong() {
+  editingSong.value = null
+  showSongEditor.value = true
+}
+
+async function editSong(song) {
+  editingSong.value = song
+  showSongEditor.value = true
+}
+
+function closeSongEditor() {
+  showSongEditor.value = false
+  editingSong.value = null
+}
+
+async function handleSaveSong(songData) {
+  try {
+    if (!props.libraryRoot || !window.electronAPI) {
+      console.error('No library root or electronAPI')
+      return
+    }
+
+    // Save song via IPC
+    const result = await window.electronAPI.saveSong(props.libraryRoot, {
+      ...songData,
+      id: editingSong.value?.id // Preserve ID if editing
+    })
+
+    if (result.success) {
+      await loadSongs() // Reload songs list
+      closeSongEditor()
+      emit('song-updated')
+    } else {
+      console.error('Failed to save song:', result.error)
+      alert('Failed to save song: ' + result.error)
+    }
+  } catch (error) {
+    console.error('Error saving song:', error)
+    alert('Error saving song: ' + error.message)
+  }
+}
+
+async function importSongs() {
+  try {
+    const result = await browseSongFiles()
+    if (result.canceled || !result.files || result.files.length === 0) {
+      return
+    }
+
+    await importSongFiles(result.files)
+    await loadSongs() // Reload songs list
+  } catch (error) {
+    console.error('Import error:', error)
+  }
+}
+
+async function confirmDeleteSong(song) {
+  deleteSongConfirmation.value = song
+  checkingSongUsage.value = true
+  songUsage.value = []
+
+  // Check which events use this song
+  try {
+    const usage = await window.electronAPI.checkSongUsage(props.libraryRoot, song.id)
+    songUsage.value = usage
+  } catch (error) {
+    console.error('Failed to check song usage:', error)
+  } finally {
+    checkingSongUsage.value = false
+  }
+}
+
+function cancelDeleteSong() {
+  deleteSongConfirmation.value = null
+  songUsage.value = []
+  checkingSongUsage.value = false
+}
+
+async function executeDeleteSong() {
+  if (!deleteSongConfirmation.value) return
+
+  try {
+    const result = await window.electronAPI.deleteSong(
+      props.libraryRoot,
+      deleteSongConfirmation.value.id
+    )
+
+    if (result.success) {
+      // Remove from local list
+      const index = songs.value.findIndex(s => s.id === deleteSongConfirmation.value.id)
+      if (index !== -1) {
+        songs.value.splice(index, 1)
+      }
+
+      emit('song-updated')
+      cancelDeleteSong()
+    } else {
+      console.error('Failed to delete song:', result.error)
+      alert('Failed to delete song: ' + result.error)
+    }
+  } catch (error) {
+    console.error('Error deleting song:', error)
+    alert('Error deleting song: ' + error.message)
+  }
+}
+
+function songUsageCount(songId) {
+  // This will be populated by checking events
+  // For now return 0, usage check happens in confirmDeleteSong
+  return 0
 }
 </script>
