@@ -21,37 +21,40 @@
         />
 
         <!-- Lyrics overlay - clean, no section names, no chords, no song info (hidden when lyricsCleared is true or section has no lyrics) -->
-        <div
-            v-if="!slide.lyricsCleared && hasLyrics"
-            class="relative z-10 w-full px-12 text-center"
-        >
-            <div class="space-y-4">
-                <div
-                    v-for="(line, lineIndex) in slide.sectionData.lines"
-                    :key="lineIndex"
-                    class="flex justify-center items-center flex-wrap whitespace-pre-wrap"
-                >
-                    <span
-                        v-for="(pair, pairIndex) in line"
-                        :key="pairIndex"
-                        class="lyrics-word"
-                        :style="{
-                            fontSize: `${baseFontSize}cqw`,
-                            fontFamily:
-                                slide.fontFamily ||
-                                'system-ui, -apple-system, sans-serif',
-                            fontWeight: slide.fontWeight || 600,
-                            color: textColor,
-                            textShadow: textShadow,
-                            letterSpacing: '0.02em',
-                            lineHeight: 1.2,
-                        }"
+        <Transition name="lyrics-fade">
+            <div
+                v-if="!slide.lyricsCleared && hasLyrics"
+                :key="lyricsKey"
+                class="relative z-10 w-full px-12 text-center"
+            >
+                <div class="space-y-4">
+                    <div
+                        v-for="(line, lineIndex) in slide.sectionData.lines"
+                        :key="lineIndex"
+                        class="flex justify-center items-center flex-wrap whitespace-pre-wrap"
                     >
-                        {{ pair[1] || "\u00A0" }}
-                    </span>
+                        <span
+                            v-for="(pair, pairIndex) in line"
+                            :key="pairIndex"
+                            class="lyrics-word"
+                            :style="{
+                                fontSize: `${baseFontSize}cqw`,
+                                fontFamily:
+                                    slide.fontFamily ||
+                                    'system-ui, -apple-system, sans-serif',
+                                fontWeight: slide.fontWeight || 600,
+                                color: textColor,
+                                textShadow: textShadow,
+                                letterSpacing: '0.02em',
+                                lineHeight: 1.2,
+                            }"
+                        >
+                            {{ pair[1] || "\u00A0" }}
+                        </span>
+                    </div>
                 </div>
             </div>
-        </div>
+        </Transition>
     </div>
 </template>
 
@@ -91,6 +94,15 @@ const hasLyrics = computed(() => {
     return props.slide.sectionData.lines.some((line) =>
         line.some((pair) => pair[1] && pair[1].trim().length > 0),
     );
+});
+
+// Unique key for lyrics to trigger transition when content changes
+const lyricsKey = computed(() => {
+    // Include section title and first line to detect changes
+    const title = props.slide.sectionData?.title || '';
+    const firstLine = props.slide.sectionData?.lines?.[0]?.[0]?.[1] || '';
+    const cleared = props.slide.lyricsCleared ? 'cleared' : 'shown';
+    return `${title}-${firstLine}-${cleared}`;
 });
 
 // Base font size using container query units (cqw) for proportional scaling
@@ -134,5 +146,29 @@ const textShadow = computed(() => {
 
 .lyrics-word {
     display: inline-block;
+}
+
+/* Lyrics fade transition - fast and smooth crossfade */
+.lyrics-fade-enter-active,
+.lyrics-fade-leave-active {
+    transition: opacity 0.3s ease-in-out;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.lyrics-fade-enter-from {
+    opacity: 0;
+}
+
+.lyrics-fade-leave-to {
+    opacity: 0;
+}
+
+.lyrics-fade-enter-to,
+.lyrics-fade-leave-from {
+    opacity: 1;
 }
 </style>
