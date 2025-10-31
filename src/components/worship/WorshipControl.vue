@@ -55,7 +55,7 @@
 </template>
 
 <script setup>
-import { watch } from 'vue'
+import { watch, onMounted, onUnmounted, computed } from 'vue'
 import { useWorship } from '@/composables/useWorship'
 
 defineEmits(['clear', 'go-live'])
@@ -73,6 +73,50 @@ const {
   prevSection,
   goLive
 } = useWorship()
+
+// Calculate grid columns based on window width
+const gridColumns = computed(() => {
+  if (typeof window === 'undefined') return 4
+  const width = window.innerWidth
+  if (width < 1024) return 2 // lg breakpoint
+  if (width < 1280) return 3 // xl breakpoint
+  return 4
+})
+
+// Keyboard navigation for worship sections (up/down only - left/right handled by ControlView)
+function handleKeydown(event) {
+  if (!currentSong.value?.processed_sections) return
+
+  const totalSections = currentSong.value.processed_sections.length
+  const cols = gridColumns.value
+  const currentIndex = stagedSectionIndex.value
+
+  switch (event.key) {
+    case 'ArrowUp':
+      // Move up (back one row)
+      if (currentIndex >= cols) {
+        stageSection(currentIndex - cols)
+        event.preventDefault()
+      }
+      break
+
+    case 'ArrowDown':
+      // Move down (forward one row)
+      if (currentIndex + cols < totalSections) {
+        stageSection(currentIndex + cols)
+        event.preventDefault()
+      }
+      break
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
+})
 
 // Debug: Log current song data
 watch(currentSong, (newSong) => {
